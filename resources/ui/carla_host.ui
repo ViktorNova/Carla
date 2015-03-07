@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1447</width>
-    <height>679</height>
+    <width>949</width>
+    <height>663</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -135,72 +135,91 @@
         <item row="2" column="0">
          <widget class="DigitalPeakMeter" name="peak_in" native="true"/>
         </item>
-        <item row="2" column="5">
-         <layout class="QVBoxLayout" name="side_buttons">
-          <item>
-           <widget class="QPushButton" name="add_group">
-            <property name="text">
-             <string>Add group</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="remove_group">
-            <property name="text">
-             <string>Remove group</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <spacer name="verticalSpacer">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>40</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item alignment="Qt::AlignHCenter">
-           <widget class="QSlider" name="zoom_slider">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-           </widget>
-          </item>
-          <item alignment="Qt::AlignHCenter">
-           <widget class="QLabel" name="zoom">
-            <property name="text">
-             <string>Zoom</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="zoom_in">
-            <property name="text">
-             <string>Zoom In</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="zoom_out">
-            <property name="text">
-             <string>Zoom Out</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item row="1" column="5">
-         <widget class="DigitalPeakMeter" name="peak_out" native="true">
-          <zorder>remove_group</zorder>
-         </widget>
-        </item>
         <item row="2" column="1">
          <widget class="QGraphicsView" name="graphicsView"/>
+        </item>
+        <item row="2" column="3">
+         <widget class="DigitalPeakMeter" name="peak_out" native="true">
+          <zorder>remove_group</zorder>
+          <zorder>sideButtons</zorder>
+         </widget>
+        </item>
+        <item row="2" column="2">
+         <widget class="QFrame" name="sideButtons">
+          <layout class="QVBoxLayout" name="verticalLayout_2">
+           <item>
+            <widget class="QPushButton" name="add_group">
+             <property name="text">
+              <string>Add group</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="remove_group">
+             <property name="text">
+              <string>Remove group</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="verticalSpacer_2">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="canvas_sidebar_zoom_in">
+             <property name="text">
+              <string>Zoom In</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="canvas_sidebar_zoom_out">
+             <property name="text">
+              <string>Zoom Out</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="verticalSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Fixed</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>16</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="canvas_sidebar_zoom_fit">
+             <property name="text">
+              <string>Show All</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="canvas_sidebar_refresh">
+             <property name="text">
+              <string>Refresh</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
         </item>
        </layout>
       </widget>
@@ -213,7 +232,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1447</width>
+     <width>949</width>
      <height>26</height>
     </rect>
    </property>
@@ -287,10 +306,12 @@
     <property name="title">
      <string>&amp;Settings</string>
     </property>
-    <addaction name="act_settings_show_time_panel"/>
     <addaction name="act_settings_show_toolbar"/>
+    <addaction name="act_settings_show_browser"/>
+    <addaction name="separator"/>
     <addaction name="act_settings_show_meters"/>
     <addaction name="act_settings_show_keyboard"/>
+    <addaction name="act_settings_show_sidebar"/>
     <addaction name="separator"/>
     <addaction name="act_settings_configure"/>
    </widget>
@@ -468,33 +489,33 @@
              </property>
             </widget>
            </item>
+           <item>
+            <widget class="CanvasPreviewFrame" name="miniCanvasPreview">
+             <property name="minimumSize">
+              <size>
+               <width>210</width>
+               <height>162</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>162</height>
+              </size>
+             </property>
+             <property name="acceptDrops">
+              <bool>false</bool>
+             </property>
+             <property name="frameShape">
+              <enum>QFrame::StyledPanel</enum>
+             </property>
+             <property name="frameShadow">
+              <enum>QFrame::Sunken</enum>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
-        </widget>
-       </item>
-       <item>
-        <widget class="CanvasPreviewFrame" name="miniCanvasPreview">
-         <property name="minimumSize">
-          <size>
-           <width>210</width>
-           <height>162</height>
-          </size>
-         </property>
-         <property name="maximumSize">
-          <size>
-           <width>16777215</width>
-           <height>162</height>
-          </size>
-         </property>
-         <property name="acceptDrops">
-          <bool>false</bool>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Sunken</enum>
-         </property>
         </widget>
        </item>
       </layout>
@@ -801,6 +822,9 @@
    <property name="checkable">
     <bool>true</bool>
    </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>Show &amp;Toolbar</string>
    </property>
@@ -869,6 +893,28 @@
     <string>&amp;Show Time Panel</string>
    </property>
   </action>
+  <action name="act_settings_show_sidebar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Canvas Sidebar</string>
+   </property>
+  </action>
+  <action name="act_settings_show_browser">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Browser</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -922,6 +968,102 @@
     <hint type="destinationlabel">
      <x>354</x>
      <y>35</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>act_settings_show_sidebar</sender>
+   <signal>triggered(bool)</signal>
+   <receiver>sideButtons</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>801</x>
+     <y>383</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>canvas_sidebar_zoom_in</sender>
+   <signal>clicked()</signal>
+   <receiver>act_canvas_zoom_in</receiver>
+   <slot>trigger()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>792</x>
+     <y>371</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>940</x>
+     <y>262</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>canvas_sidebar_zoom_out</sender>
+   <signal>clicked()</signal>
+   <receiver>act_canvas_zoom_out</receiver>
+   <slot>trigger()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>801</x>
+     <y>408</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>canvas_sidebar_zoom_fit</sender>
+   <signal>clicked()</signal>
+   <receiver>act_canvas_zoom_fit</receiver>
+   <slot>trigger()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>801</x>
+     <y>470</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>canvas_sidebar_refresh</sender>
+   <signal>clicked()</signal>
+   <receiver>act_canvas_refresh</receiver>
+   <slot>trigger()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>852</x>
+     <y>641</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>474</x>
+     <y>331</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>act_settings_show_browser</sender>
+   <signal>triggered(bool)</signal>
+   <receiver>dockWidget</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>110</x>
+     <y>362</y>
     </hint>
    </hints>
   </connection>
