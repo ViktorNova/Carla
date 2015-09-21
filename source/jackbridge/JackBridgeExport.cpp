@@ -1,6 +1,6 @@
 /*
  * JackBridge (Part 3, Export)
- * Copyright (C) 2013-2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2013-2015 Filipe Coelho <falktx@falktx.com>
  *
  * Permission to use, copy, modify, and/or distribute this software for any purpose with
  * or without fee is hereby granted, provided that the above copyright notice and this
@@ -52,7 +52,9 @@ public:
     {
         static JackBridgeExportedFunctions fallback;
         carla_zeroStruct(fallback);
-        ++fallback.unique2;
+        fallback.unique1 = 1;
+        fallback.unique2 = 2;
+        fallback.unique3 = 3;
 
         static const JackBridgeExported bridge;
         CARLA_SAFE_ASSERT_RETURN(bridge.func != nullptr, fallback);
@@ -61,6 +63,7 @@ public:
         CARLA_SAFE_ASSERT_RETURN(funcs != nullptr, fallback);
         CARLA_SAFE_ASSERT_RETURN(funcs->unique1 != 0, fallback);
         CARLA_SAFE_ASSERT_RETURN(funcs->unique1 == funcs->unique2, fallback);
+        CARLA_SAFE_ASSERT_RETURN(funcs->unique2 == funcs->unique3, fallback);
         CARLA_SAFE_ASSERT_RETURN(funcs->shm_map_ptr != nullptr, fallback);
 
         return *funcs;
@@ -87,7 +90,12 @@ static const JackBridgeExportedFunctions& getBridgeInstance() noexcept
 bool jackbridge_is_ok() noexcept
 {
     const JackBridgeExportedFunctions& instance(getBridgeInstance());
-    return (instance.unique1 != 0 && instance.unique1 == instance.unique2);
+    return (instance.unique1 != 0 && instance.unique1 == instance.unique2 && instance.init_ptr != nullptr);
+}
+
+void jackbridge_init()
+{
+    return getBridgeInstance().init_ptr();
 }
 
 void jackbridge_get_version(int* major_ptr, int* minor_ptr, int* micro_ptr, int* proto_ptr)
@@ -100,7 +108,7 @@ const char* jackbridge_get_version_string()
     return getBridgeInstance().get_version_string_ptr();
 }
 
-jack_client_t* jackbridge_client_open(const char* client_name, jack_options_t options, jack_status_t* status)
+jack_client_t* jackbridge_client_open(const char* client_name, uint32_t options, jack_status_t* status)
 {
     return getBridgeInstance().client_open_ptr(client_name, options, status);
 }
@@ -235,7 +243,7 @@ float jackbridge_cpu_load(jack_client_t* client)
     return getBridgeInstance().cpu_load_ptr(client);
 }
 
-jack_port_t* jackbridge_port_register(jack_client_t* client, const char* port_name, const char* port_type, ulong flags, ulong buffer_size)
+jack_port_t* jackbridge_port_register(jack_client_t* client, const char* port_name, const char* port_type, uint64_t flags, uint64_t buffer_size)
 {
     return getBridgeInstance().port_register_ptr(client, port_name, port_type, flags, buffer_size);
 }
@@ -300,9 +308,9 @@ const char** jackbridge_port_get_all_connections(const jack_client_t* client, co
     return getBridgeInstance().port_get_all_connections_ptr(client, port);
 }
 
-bool jackbridge_port_set_name(jack_port_t* port, const char* port_name)
+bool jackbridge_port_rename(jack_client_t* client, jack_port_t* port, const char* port_name)
 {
-    return getBridgeInstance().port_set_name_ptr(port, port_name);
+    return getBridgeInstance().port_rename_ptr(client, port, port_name);
 }
 
 bool jackbridge_port_set_alias(jack_port_t* port, const char* alias)
@@ -365,17 +373,17 @@ int jackbridge_port_type_size()
     return getBridgeInstance().port_type_size_ptr();
 }
 
-size_t jackbridge_port_type_get_buffer_size(jack_client_t* client, const char* port_type)
+uint32_t jackbridge_port_type_get_buffer_size(jack_client_t* client, const char* port_type)
 {
     return getBridgeInstance().port_type_get_buffer_size_ptr(client, port_type);
 }
 
-void jackbridge_port_get_latency_range(jack_port_t* port, jack_latency_callback_mode_t mode, jack_latency_range_t* range)
+void jackbridge_port_get_latency_range(jack_port_t* port, uint32_t mode, jack_latency_range_t* range)
 {
     return getBridgeInstance().port_get_latency_range_ptr(port, mode, range);
 }
 
-void jackbridge_port_set_latency_range(jack_port_t* port, jack_latency_callback_mode_t mode, jack_latency_range_t* range)
+void jackbridge_port_set_latency_range(jack_port_t* port, uint32_t mode, jack_latency_range_t* range)
 {
     return getBridgeInstance().port_set_latency_range_ptr(port, mode, range);
 }
@@ -385,7 +393,7 @@ bool jackbridge_recompute_total_latencies(jack_client_t* client)
     return getBridgeInstance().recompute_total_latencies_ptr(client);
 }
 
-const char** jackbridge_get_ports(jack_client_t* client, const char* port_name_pattern, const char* type_name_pattern, ulong flags)
+const char** jackbridge_get_ports(jack_client_t* client, const char* port_name_pattern, const char* type_name_pattern, uint64_t flags)
 {
     return getBridgeInstance().get_ports_ptr(client, port_name_pattern, type_name_pattern, flags);
 }
@@ -420,12 +428,12 @@ void jackbridge_midi_clear_buffer(void* port_buffer)
     return getBridgeInstance().midi_clear_buffer_ptr(port_buffer);
 }
 
-bool jackbridge_midi_event_write(void* port_buffer, jack_nframes_t time, const jack_midi_data_t* data, size_t data_size)
+bool jackbridge_midi_event_write(void* port_buffer, jack_nframes_t time, const jack_midi_data_t* data, uint32_t data_size)
 {
     return getBridgeInstance().midi_event_write_ptr(port_buffer, time, data, data_size);
 }
 
-jack_midi_data_t* jackbridge_midi_event_reserve(void* port_buffer, jack_nframes_t time, size_t data_size)
+jack_midi_data_t* jackbridge_midi_event_reserve(void* port_buffer, jack_nframes_t time, uint32_t data_size)
 {
     return getBridgeInstance().midi_event_reserve_ptr(port_buffer, time, data_size);
 }
@@ -455,7 +463,7 @@ bool jackbridge_transport_locate(jack_client_t* client, jack_nframes_t frame)
     return getBridgeInstance().transport_locate_ptr(client, frame);
 }
 
-jack_transport_state_t jackbridge_transport_query(const jack_client_t* client, jack_position_t* pos)
+uint32_t jackbridge_transport_query(const jack_client_t* client, jack_position_t* pos)
 {
     return getBridgeInstance().transport_query_ptr(client, pos);
 }
@@ -535,14 +543,14 @@ void jackbridge_sem_destroy(void* sem) noexcept
     getBridgeInstance().sem_destroy_ptr(sem);
 }
 
-bool jackbridge_sem_post(void* sem) noexcept
+void jackbridge_sem_post(void* sem) noexcept
 {
-    return getBridgeInstance().sem_post_ptr(sem);
+    getBridgeInstance().sem_post_ptr(sem);
 }
 
-bool jackbridge_sem_timedwait(void* sem, uint secs, bool* timedOut) noexcept
+bool jackbridge_sem_timedwait(void* sem, uint secs) noexcept
 {
-    return getBridgeInstance().sem_timedwait_ptr(sem, secs, timedOut);
+    return getBridgeInstance().sem_timedwait_ptr(sem, secs);
 }
 
 bool jackbridge_shm_is_valid(const void* shm) noexcept
@@ -565,7 +573,7 @@ void jackbridge_shm_close(void* shm) noexcept
     return getBridgeInstance().shm_close_ptr(shm);
 }
 
-void* jackbridge_shm_map(void* shm, size_t size) noexcept
+void* jackbridge_shm_map(void* shm, uint64_t size) noexcept
 {
     return getBridgeInstance().shm_map_ptr(shm, size);
 }

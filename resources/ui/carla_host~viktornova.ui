@@ -1,0 +1,1109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CarlaHostW</class>
+ <widget class="QMainWindow" name="CarlaHostW">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>949</width>
+    <height>663</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout_3">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>1</number>
+      </property>
+      <widget class="QWidget" name="rack">
+       <attribute name="title">
+        <string>Rack</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>1</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="pad_left">
+          <property name="minimumSize">
+           <size>
+            <width>25</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>25</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="RackListWidget" name="listWidget">
+          <property name="verticalScrollBarPolicy">
+           <enum>Qt::ScrollBarAlwaysOff</enum>
+          </property>
+          <property name="horizontalScrollBarPolicy">
+           <enum>Qt::ScrollBarAlwaysOff</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="pad_right">
+          <property name="minimumSize">
+           <size>
+            <width>25</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>25</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QScrollBar" name="rackScrollBar">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="patchbay">
+       <attribute name="title">
+        <string>Patchbay</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayout">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>1</number>
+        </property>
+        <property name="spacing">
+         <number>1</number>
+        </property>
+        <item row="2" column="0">
+         <widget class="DigitalPeakMeter" name="peak_in" native="true"/>
+        </item>
+        <item row="2" column="1">
+         <widget class="QGraphicsView" name="graphicsView"/>
+        </item>
+        <item row="2" column="3">
+         <widget class="DigitalPeakMeter" name="peak_out" native="true">
+          <zorder>remove_group</zorder>
+          <zorder>sideButtons</zorder>
+         </widget>
+        </item>
+        <item row="2" column="2">
+         <widget class="QFrame" name="sideButtons">
+          <layout class="QVBoxLayout" name="verticalLayout_2">
+           <item>
+            <widget class="QPushButton" name="add_group">
+             <property name="text">
+              <string>Add group</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="remove_group">
+             <property name="text">
+              <string>Remove group</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="verticalSpacer_2">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="canvas_sidebar_zoom_in">
+             <property name="text">
+              <string>Zoom In</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="canvas_sidebar_zoom_out">
+             <property name="text">
+              <string>Zoom Out</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="verticalSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Fixed</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>16</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="canvas_sidebar_zoom_fit">
+             <property name="text">
+              <string>Show All</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="canvas_sidebar_refresh">
+             <property name="text">
+              <string>Refresh</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>949</width>
+     <height>26</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_File">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="act_file_connect"/>
+    <addaction name="act_file_refresh"/>
+    <addaction name="act_file_new"/>
+    <addaction name="act_file_open"/>
+    <addaction name="act_file_save"/>
+    <addaction name="act_file_save_as"/>
+    <addaction name="separator"/>
+    <addaction name="act_file_quit"/>
+   </widget>
+   <widget class="QMenu" name="menu_Engine">
+    <property name="title">
+     <string>&amp;Engine</string>
+    </property>
+    <addaction name="act_engine_start"/>
+    <addaction name="act_engine_stop"/>
+   </widget>
+   <widget class="QMenu" name="menu_Plugin">
+    <property name="title">
+     <string>P&amp;lugin</string>
+    </property>
+    <widget class="QMenu" name="menu_PluginMacros">
+     <property name="title">
+      <string>&amp;Macros (all plugins)</string>
+     </property>
+     <addaction name="act_plugins_enable"/>
+     <addaction name="act_plugins_disable"/>
+     <addaction name="separator"/>
+     <addaction name="act_plugins_volume100"/>
+     <addaction name="act_plugins_mute"/>
+     <addaction name="separator"/>
+     <addaction name="act_plugins_wet100"/>
+     <addaction name="act_plugins_bypass"/>
+     <addaction name="separator"/>
+     <addaction name="act_plugins_center"/>
+     <addaction name="separator"/>
+     <addaction name="act_plugins_compact"/>
+     <addaction name="act_plugins_expand"/>
+    </widget>
+    <addaction name="act_plugin_add"/>
+    <addaction name="act_plugin_remove_all"/>
+    <addaction name="separator"/>
+    <addaction name="menu_PluginMacros"/>
+   </widget>
+   <widget class="QMenu" name="menu_Canvas">
+    <property name="title">
+     <string>&amp;Canvas</string>
+    </property>
+    <widget class="QMenu" name="menu_Canvas_Zoom">
+     <property name="title">
+      <string>&amp;Zoom</string>
+     </property>
+     <addaction name="act_canvas_zoom_fit"/>
+     <addaction name="separator"/>
+     <addaction name="act_canvas_zoom_in"/>
+     <addaction name="act_canvas_zoom_out"/>
+     <addaction name="act_canvas_zoom_100"/>
+    </widget>
+    <addaction name="act_canvas_show_internal"/>
+    <addaction name="act_canvas_show_external"/>
+    <addaction name="separator"/>
+    <addaction name="act_canvas_arrange"/>
+    <addaction name="act_canvas_refresh"/>
+    <addaction name="menu_Canvas_Zoom"/>
+    <addaction name="separator"/>
+    <addaction name="act_canvas_print"/>
+    <addaction name="act_canvas_save_image"/>
+   </widget>
+   <widget class="QMenu" name="menu_Settings">
+    <property name="title">
+     <string>&amp;Settings</string>
+    </property>
+    <addaction name="act_settings_show_toolbar"/>
+    <addaction name="act_settings_show_browser"/>
+    <addaction name="separator"/>
+    <addaction name="act_settings_show_meters"/>
+    <addaction name="act_settings_show_keyboard"/>
+    <addaction name="act_settings_show_sidebar"/>
+    <addaction name="separator"/>
+    <addaction name="act_settings_configure"/>
+   </widget>
+   <widget class="QMenu" name="menu_Help">
+    <property name="title">
+     <string>&amp;Help</string>
+    </property>
+    <addaction name="act_help_about"/>
+    <addaction name="act_help_about_juce"/>
+    <addaction name="act_help_about_qt"/>
+   </widget>
+   <addaction name="menu_File"/>
+   <addaction name="menu_Engine"/>
+   <addaction name="menu_Plugin"/>
+   <addaction name="menu_Canvas"/>
+   <addaction name="menu_Settings"/>
+   <addaction name="menu_Help"/>
+  </widget>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <property name="movable">
+    <bool>false</bool>
+   </property>
+   <property name="allowedAreas">
+    <set>Qt::NoToolBarArea</set>
+   </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonTextBesideIcon</enum>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="act_file_new"/>
+   <addaction name="act_file_open"/>
+   <addaction name="act_file_save"/>
+   <addaction name="act_file_save_as"/>
+   <addaction name="act_file_connect"/>
+   <addaction name="act_file_refresh"/>
+   <addaction name="separator"/>
+   <addaction name="act_plugin_add2"/>
+   <addaction name="act_plugin_remove_all"/>
+   <addaction name="act_plugins_panic"/>
+   <addaction name="separator"/>
+   <addaction name="act_settings_configure"/>
+  </widget>
+  <widget class="QDockWidget" name="dockWidget">
+   <property name="features">
+    <set>QDockWidget::NoDockWidgetFeatures</set>
+   </property>
+   <property name="allowedAreas">
+    <set>Qt::NoDockWidgetArea</set>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>1</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents">
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <property name="spacing">
+      <number>0</number>
+     </property>
+     <property name="leftMargin">
+      <number>0</number>
+     </property>
+     <property name="topMargin">
+      <number>1</number>
+     </property>
+     <property name="rightMargin">
+      <number>0</number>
+     </property>
+     <property name="bottomMargin">
+      <number>0</number>
+     </property>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_4">
+       <property name="spacing">
+        <number>1</number>
+       </property>
+       <item>
+        <widget class="QTabWidget" name="tabUtils">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Ignored" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>210</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="acceptDrops">
+          <bool>false</bool>
+         </property>
+         <property name="tabPosition">
+          <enum>QTabWidget::West</enum>
+         </property>
+         <property name="currentIndex">
+          <number>0</number>
+         </property>
+         <widget class="QWidget" name="disk">
+          <property name="acceptDrops">
+           <bool>false</bool>
+          </property>
+          <attribute name="title">
+           <string>Disk</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="verticalLayout_3">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>1</number>
+           </property>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout">
+             <item>
+              <widget class="QComboBox" name="cb_disk">
+               <item>
+                <property name="text">
+                 <string>Home</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="b_disk_add">
+               <property name="text">
+                <string/>
+               </property>
+               <property name="icon">
+                <iconset resource="../resources.qrc">
+                 <normaloff>:/16x16/list-add.png</normaloff>:/16x16/list-add.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="b_disk_remove">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+               <property name="icon">
+                <iconset resource="../resources.qrc">
+                 <normaloff>:/16x16/list-remove.png</normaloff>:/16x16/list-remove.png</iconset>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QTreeView" name="fileTreeView">
+             <property name="editTriggers">
+              <set>QAbstractItemView::NoEditTriggers</set>
+             </property>
+             <property name="dragEnabled">
+              <bool>true</bool>
+             </property>
+             <property name="dragDropMode">
+              <enum>QAbstractItemView::DragOnly</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="CanvasPreviewFrame" name="miniCanvasPreview">
+             <property name="minimumSize">
+              <size>
+               <width>210</width>
+               <height>162</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>162</height>
+              </size>
+             </property>
+             <property name="acceptDrops">
+              <bool>false</bool>
+             </property>
+             <property name="frameShape">
+              <enum>QFrame::StyledPanel</enum>
+             </property>
+             <property name="frameShadow">
+              <enum>QFrame::Sunken</enum>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <action name="act_file_new">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/document-new.png</normaloff>:/16x16/document-new.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;New</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
+  </action>
+  <action name="act_file_open">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/document-open.png</normaloff>:/16x16/document-open.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Open...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="act_file_save">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/document-save.png</normaloff>:/16x16/document-save.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Save</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="act_file_save_as">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/document-save-as.png</normaloff>:/16x16/document-save-as.png</iconset>
+   </property>
+   <property name="text">
+    <string>Save &amp;As...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+S</string>
+   </property>
+  </action>
+  <action name="act_file_quit">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/application-exit.png</normaloff>:/16x16/application-exit.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Quit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="act_engine_start">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/media-playback-start.png</normaloff>:/16x16/media-playback-start.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Start</string>
+   </property>
+   <property name="shortcut">
+    <string>F5</string>
+   </property>
+  </action>
+  <action name="act_engine_stop">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/media-playback-stop.png</normaloff>:/16x16/media-playback-stop.png</iconset>
+   </property>
+   <property name="text">
+    <string>St&amp;op</string>
+   </property>
+   <property name="shortcut">
+    <string>F6</string>
+   </property>
+  </action>
+  <action name="act_plugin_add">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/list-add.png</normaloff>:/16x16/list-add.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Add...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+A</string>
+   </property>
+  </action>
+  <action name="act_plugin_add2">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/list-add.png</normaloff>:/16x16/list-add.png</iconset>
+   </property>
+   <property name="text">
+    <string>Add Plugin...</string>
+   </property>
+  </action>
+  <action name="act_plugin_remove_all">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/edit-delete.png</normaloff>:/16x16/edit-delete.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Remove All</string>
+   </property>
+  </action>
+  <action name="act_plugins_enable">
+   <property name="text">
+    <string>&amp;Enable</string>
+   </property>
+  </action>
+  <action name="act_plugins_disable">
+   <property name="text">
+    <string>&amp;Disable</string>
+   </property>
+  </action>
+  <action name="act_plugins_bypass">
+   <property name="text">
+    <string>0% &amp;Wet (Bypass)</string>
+   </property>
+  </action>
+  <action name="act_plugins_wet100">
+   <property name="text">
+    <string>100% Wet</string>
+   </property>
+  </action>
+  <action name="act_plugins_mute">
+   <property name="text">
+    <string>&amp;0% Volume (Mute)</string>
+   </property>
+  </action>
+  <action name="act_plugins_volume100">
+   <property name="text">
+    <string>&amp;100% Volume</string>
+   </property>
+  </action>
+  <action name="act_plugins_center">
+   <property name="text">
+    <string>&amp;Center Balance</string>
+   </property>
+  </action>
+  <action name="act_plugins_panic">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/dialog-warning.png</normaloff>:/16x16/dialog-warning.png</iconset>
+   </property>
+   <property name="text">
+    <string>Panic</string>
+   </property>
+  </action>
+  <action name="act_transport_play">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/media-playback-start.png</normaloff>:/16x16/media-playback-start.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Play</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+P</string>
+   </property>
+  </action>
+  <action name="act_transport_stop">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/media-playback-stop.png</normaloff>:/16x16/media-playback-stop.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Stop</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+X</string>
+   </property>
+  </action>
+  <action name="act_transport_backwards">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/media-seek-backward.png</normaloff>:/16x16/media-seek-backward.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Backwards</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+B</string>
+   </property>
+  </action>
+  <action name="act_transport_forwards">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/media-seek-forward.png</normaloff>:/16x16/media-seek-forward.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Forwards</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+F</string>
+   </property>
+  </action>
+  <action name="act_canvas_arrange">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/view-sort-ascending.png</normaloff>:/16x16/view-sort-ascending.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Arrange</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+G</string>
+   </property>
+  </action>
+  <action name="act_canvas_refresh">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/view-refresh.png</normaloff>:/16x16/view-refresh.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Refresh</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
+   </property>
+  </action>
+  <action name="act_canvas_print">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/document-print.png</normaloff>:/16x16/document-print.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Print...</string>
+   </property>
+  </action>
+  <action name="act_canvas_save_image">
+   <property name="text">
+    <string>Save &amp;Image...</string>
+   </property>
+  </action>
+  <action name="act_canvas_zoom_fit">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/zoom-fit-best.png</normaloff>:/16x16/zoom-fit-best.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Auto-Fit</string>
+   </property>
+   <property name="shortcut">
+    <string>Home</string>
+   </property>
+  </action>
+  <action name="act_canvas_zoom_in">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/zoom-in.png</normaloff>:/16x16/zoom-in.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Zoom In</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl++</string>
+   </property>
+  </action>
+  <action name="act_canvas_zoom_out">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/zoom-out.png</normaloff>:/16x16/zoom-out.png</iconset>
+   </property>
+   <property name="text">
+    <string>Zoom &amp;Out</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+-</string>
+   </property>
+  </action>
+  <action name="act_canvas_zoom_100">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/zoom-original.png</normaloff>:/16x16/zoom-original.png</iconset>
+   </property>
+   <property name="text">
+    <string>Zoom &amp;100%</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+1</string>
+   </property>
+  </action>
+  <action name="act_settings_show_toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show &amp;Toolbar</string>
+   </property>
+  </action>
+  <action name="act_settings_configure">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/configure.png</normaloff>:/16x16/configure.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Configure Carla</string>
+   </property>
+  </action>
+  <action name="act_help_about">
+   <property name="text">
+    <string>&amp;About</string>
+   </property>
+  </action>
+  <action name="act_help_about_qt">
+   <property name="text">
+    <string>About &amp;Qt</string>
+   </property>
+  </action>
+  <action name="act_settings_show_meters">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Canvas &amp;Meters</string>
+   </property>
+  </action>
+  <action name="act_settings_show_keyboard">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Canvas &amp;Keyboard</string>
+   </property>
+  </action>
+  <action name="act_help_about_juce">
+   <property name="text">
+    <string>About &amp;JUCE</string>
+   </property>
+  </action>
+  <action name="act_canvas_show_internal">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Show Internal</string>
+   </property>
+  </action>
+  <action name="act_canvas_show_external">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show &amp;External</string>
+   </property>
+  </action>
+  <action name="act_settings_show_time_panel">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Show Time Panel</string>
+   </property>
+  </action>
+  <action name="act_settings_show_sidebar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Canvas Sidebar</string>
+   </property>
+  </action>
+  <action name="act_settings_show_browser">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Browser</string>
+   </property>
+  </action>
+  <action name="act_file_connect">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/network-connect.png</normaloff>:/16x16/network-connect.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Connect...</string>
+   </property>
+  </action>
+  <action name="act_file_refresh">
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/16x16/view-refresh.png</normaloff>:/16x16/view-refresh.png</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Refresh</string>
+   </property>
+  </action>
+  <action name="act_plugins_compact">
+   <property name="text">
+    <string>Compact Slots</string>
+   </property>
+  </action>
+  <action name="act_plugins_expand">
+   <property name="text">
+    <string>Expand Slots</string>
+   </property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DigitalPeakMeter</class>
+   <extends>QWidget</extends>
+   <header>digitalpeakmeter.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>CanvasPreviewFrame</class>
+   <extends>QFrame</extends>
+   <header>canvaspreviewframe.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>RackListWidget</class>
+   <extends>QListWidget</extends>
+   <header>racklistwidget.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>act_file_quit</sender>
+   <signal>triggered()</signal>
+   <receiver>CarlaHostW</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>189</x>
+     <y>34</y>
+    </hint>
+   </hints>
+  </connection>
+<<<<<<< HEAD
+  <connection>
+   <sender>act_settings_show_toolbar</sender>
+   <signal>triggered(bool)</signal>
+   <receiver>toolBar</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>354</x>
+     <y>35</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>act_settings_show_sidebar</sender>
+   <signal>triggered(bool)</signal>
+   <receiver>sideButtons</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>801</x>
+     <y>383</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>canvas_sidebar_zoom_in</sender>
+   <signal>clicked()</signal>
+   <receiver>act_canvas_zoom_in</receiver>
+   <slot>trigger()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>792</x>
+     <y>371</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>940</x>
+     <y>262</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>canvas_sidebar_zoom_out</sender>
+   <signal>clicked()</signal>
+   <receiver>act_canvas_zoom_out</receiver>
+   <slot>trigger()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>801</x>
+     <y>408</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>canvas_sidebar_zoom_fit</sender>
+   <signal>clicked()</signal>
+   <receiver>act_canvas_zoom_fit</receiver>
+   <slot>trigger()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>801</x>
+     <y>470</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>canvas_sidebar_refresh</sender>
+   <signal>clicked()</signal>
+   <receiver>act_canvas_refresh</receiver>
+   <slot>trigger()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>852</x>
+     <y>641</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>474</x>
+     <y>331</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>act_settings_show_browser</sender>
+   <signal>triggered(bool)</signal>
+   <receiver>dockWidget</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>110</x>
+     <y>362</y>
+    </hint>
+   </hints>
+  </connection>
+=======
+>>>>>>> upstream/master
+ </connections>
+</ui>

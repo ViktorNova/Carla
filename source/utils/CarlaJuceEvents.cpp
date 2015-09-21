@@ -41,8 +41,7 @@ public:
         : Thread("JuceEventsThread"),
           fInitializing(false),
           fLock(),
-          fQueue(),
-          leakDetector_JuceEventsThread() {}
+          fQueue() {}
 
     ~JuceEventsThread()
     {
@@ -68,6 +67,11 @@ public:
 protected:
     void run() override
     {
+        /*
+         * We need to know when we're initializing because MessageManager::setCurrentThreadAsMessageThread()
+         * calls doPlatformSpecificInitialisation/Shutdown, in which we started this thread previously.
+         * To avoid a deadlock we do not call start/stopThread if still initializing.
+         */
         fInitializing = true;
 
         if (MessageManager* const msgMgr = MessageManager::getInstance())
@@ -85,7 +89,7 @@ protected:
     }
 
 private:
-    bool fInitializing;
+    volatile bool fInitializing;
     CriticalSection fLock;
     ReferenceCountedArray<MessageManager::MessageBase> fQueue;
 
@@ -141,6 +145,12 @@ bool MessageManager::postMessageToSystemQueue(MessageManager::MessageBase* const
 {
     JuceEventsThread& juceEventsThread(getJuceEventsThreadInstance());
     return juceEventsThread.postMessage(message);
+}
+
+bool MessageManager::dispatchNextMessageOnSystemQueue(bool)
+{
+    carla_stderr2("MessageManager::dispatchNextMessageOnSystemQueue() unsupported");
+    return false;
 }
 
 } // namespace juce

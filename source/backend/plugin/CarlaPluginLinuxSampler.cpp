@@ -59,8 +59,7 @@ public:
     AudioOutputDevicePlugin(const CarlaEngine* const engine, const CarlaPlugin* const plugin, const bool uses16Outs)
         : AudioOutputDevice(std::map<std::string, DeviceCreationParameter*>()),
           kEngine(engine),
-          kPlugin(plugin),
-          leakDetector_AudioOutputDevicePlugin()
+          kPlugin(plugin)
     {
         CARLA_ASSERT(engine != nullptr);
         CARLA_ASSERT(plugin != nullptr);
@@ -130,8 +129,7 @@ class MidiInputPortPlugin : public MidiInputPort
 {
 public:
     MidiInputPortPlugin(MidiInputDevice* const device, const int portNum = 0)
-        : MidiInputPort(device, portNum),
-          leakDetector_MidiInputPortPlugin() {}
+        : MidiInputPort(device, portNum) {}
 
     CARLA_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiInputPortPlugin)
 };
@@ -143,8 +141,7 @@ class MidiInputDevicePlugin : public MidiInputDevice
 {
 public:
     MidiInputDevicePlugin(Sampler* const sampler)
-        : MidiInputDevice(std::map<std::string, DeviceCreationParameter*>(), sampler),
-          leakDetector_MidiInputDevicePlugin()
+        : MidiInputDevice(std::map<std::string, DeviceCreationParameter*>(), sampler)
     {
         AcquirePorts(1);
     }
@@ -210,8 +207,7 @@ public:
           fMidiInputDevice(sSampler),
           fMidiInputPort(nullptr),
           fInstrumentIds(),
-          fInstrumentInfo(),
-          leakDetector_CarlaPluginLinuxSampler()
+          fInstrumentInfo()
     {
         carla_debug("CarlaPluginLinuxSampler::CarlaPluginLinuxSampler(%p, %i, %s, %s)", engine, id, bool2str(isGIG), bool2str(use16Outs));
 
@@ -219,11 +215,11 @@ public:
         sSampler->SetGlobalMaxStreams(LinuxSampler::kMaxStreams);
         sSampler->SetGlobalMaxVoices(LinuxSampler::kMaxVoices);
 
-        carla_zeroStruct(fCurProgs,        MAX_MIDI_CHANNELS);
-        carla_zeroStruct(fSamplerChannels, MAX_MIDI_CHANNELS);
-        carla_zeroStruct(fEngineChannels,  MAX_MIDI_CHANNELS);
+        carla_zeroStructs(fCurProgs,        MAX_MIDI_CHANNELS);
+        carla_zeroStructs(fSamplerChannels, MAX_MIDI_CHANNELS);
+        carla_zeroStructs(fEngineChannels,  MAX_MIDI_CHANNELS);
 
-        carla_zeroFloat(fParamBuffers, LinuxSamplerParametersMax);
+        carla_zeroFloats(fParamBuffers, LinuxSamplerParametersMax);
 
         if (use16Outs && ! isGIG)
             carla_stderr("Tried to use SFZ with 16 stereo outs, this doesn't make much sense so single stereo mode will be used instead");
@@ -429,6 +425,9 @@ public:
         CARLA_SAFE_ASSERT_RETURN(value != nullptr && value[0] != '\0',);
         carla_debug("CarlaPluginLinuxSampler::setCustomData(%s, \"%s\", \"%s\", %s)", type, key, value, bool2str(sendGui));
 
+        if (std::strcmp(type, CUSTOM_DATA_TYPE_PROPERTY) == 0)
+            return CarlaPlugin::setCustomData(type, key, value, sendGui);
+
         if (std::strcmp(type, CUSTOM_DATA_TYPE_STRING) != 0)
             return carla_stderr2("CarlaPluginLinuxSampler::setCustomData(\"%s\", \"%s\", \"%s\", %s) - type is not string", type, key, value, bool2str(sendGui));
 
@@ -576,7 +575,7 @@ public:
 
                 portName.truncate(portNameSize);
 
-                pData->audioOut.ports[i].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false);
+                pData->audioOut.ports[i].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false, i);
                 pData->audioOut.ports[i].rindex = i;
             }
         }
@@ -594,7 +593,7 @@ public:
             portName += "out-left";
             portName.truncate(portNameSize);
 
-            pData->audioOut.ports[0].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false);
+            pData->audioOut.ports[0].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false, 0);
             pData->audioOut.ports[0].rindex = 0;
 
             // out-right
@@ -609,7 +608,7 @@ public:
             portName += "out-right";
             portName.truncate(portNameSize);
 
-            pData->audioOut.ports[1].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false);
+            pData->audioOut.ports[1].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false, 1);
             pData->audioOut.ports[1].rindex = 1;
         }
 
@@ -628,7 +627,7 @@ public:
             portName += "events-in";
             portName.truncate(portNameSize);
 
-            pData->event.portIn = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, true);
+            pData->event.portIn = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, true, 0);
         }
 
         // ---------------------------------------
@@ -681,11 +680,11 @@ public:
         pData->extraHints  = 0x0;
         pData->extraHints |= PLUGIN_EXTRA_HINT_HAS_MIDI_IN;
 
+        if (kMaxChannels > 1 && fInstrumentIds.size() > 1)
+            pData->hints |= PLUGIN_USES_MULTI_PROGS;
+
         if (! kUses16Outs)
             pData->extraHints |= PLUGIN_EXTRA_HINT_CAN_RUN_RACK;
-
-        if (fInstrumentIds.size() > 1)
-            pData->extraHints |= PLUGIN_EXTRA_HINT_USES_MULTI_PROGS;
 
         bufferSizeChanged(pData->engine->getBufferSize());
         reloadPrograms(true);
@@ -717,7 +716,7 @@ public:
 
 #if defined(HAVE_LIBLO) && ! defined(BUILD_BRIDGE)
         // Update OSC Names
-        if (pData->engine->isOscControlRegistered())
+        if (pData->engine->isOscControlRegistered() && pData->id < pData->engine->getCurrentPluginCount())
         {
             pData->engine->oscSend_control_set_program_count(pData->id, count);
 
@@ -818,7 +817,7 @@ public:
 
             if (pData->extNotes.mutex.tryLock())
             {
-                for (RtLinkedList<ExternalMidiNote>::Itenerator it = pData->extNotes.data.begin(); it.valid(); it.next())
+                for (RtLinkedList<ExternalMidiNote>::Itenerator it = pData->extNotes.data.begin2(); it.valid(); it.next())
                 {
                     const ExternalMidiNote& note(it.getValue());
 
@@ -1101,8 +1100,8 @@ public:
         // Post-processing (dry/wet, volume and balance)
 
         {
-            const bool doVolume  = (pData->hints & PLUGIN_CAN_VOLUME) != 0 && ! carla_compareFloats(pData->postProc.volume, 1.0f);
-            const bool doBalance = (pData->hints & PLUGIN_CAN_BALANCE) != 0 && ! (carla_compareFloats(pData->postProc.balanceLeft, -1.0f) && carla_compareFloats(pData->postProc.balanceRight, 1.0f));
+            const bool doVolume  = (pData->hints & PLUGIN_CAN_VOLUME) != 0 && carla_isNotEqual(pData->postProc.volume, 1.0f);
+            const bool doBalance = (pData->hints & PLUGIN_CAN_BALANCE) != 0 && ! (carla_isEqual(pData->postProc.balanceLeft, -1.0f) && carla_isEqual(pData->postProc.balanceRight, 1.0f));
 
             float oldBufLeft[doBalance ? frames : 1];
 
@@ -1427,8 +1426,6 @@ CarlaPlugin* CarlaPlugin::newLinuxSampler(const Initializer& init, const char* c
         delete plugin;
         return nullptr;
     }
-
-    plugin->reload();
 
     return plugin;
 #else

@@ -1,6 +1,6 @@
 /*
  * DISTRHO ProM Plugin
- * Copyright (C) 2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -35,13 +35,13 @@ protected:
     // -------------------------------------------------------------------
     // DSP Callbacks
 
-    void d_parameterChanged(uint32_t, float) override;
+    void parameterChanged(uint32_t, float) override;
 
     // -------------------------------------------------------------------
     // UI Callbacks
 
-    void d_uiIdle() override;
-    void d_uiReshape(uint width, uint height) override;
+    void uiIdle() override;
+    void uiReshape(uint width, uint height) override;
 
     // -------------------------------------------------------------------
     // Widget Callbacks

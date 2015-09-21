@@ -64,28 +64,29 @@ const uint32_t CARLA_URI_MAP_ID_ATOM_TRANSFER_ATOM     = 22;
 const uint32_t CARLA_URI_MAP_ID_ATOM_TRANSFER_EVENT    = 23;
 const uint32_t CARLA_URI_MAP_ID_BUF_MAX_LENGTH         = 24;
 const uint32_t CARLA_URI_MAP_ID_BUF_MIN_LENGTH         = 25;
-const uint32_t CARLA_URI_MAP_ID_BUF_SEQUENCE_SIZE      = 26;
-const uint32_t CARLA_URI_MAP_ID_LOG_ERROR              = 27;
-const uint32_t CARLA_URI_MAP_ID_LOG_NOTE               = 28;
-const uint32_t CARLA_URI_MAP_ID_LOG_TRACE              = 29;
-const uint32_t CARLA_URI_MAP_ID_LOG_WARNING            = 30;
-const uint32_t CARLA_URI_MAP_ID_TIME_POSITION          = 31; // base type
-const uint32_t CARLA_URI_MAP_ID_TIME_BAR               = 32; // values
-const uint32_t CARLA_URI_MAP_ID_TIME_BAR_BEAT          = 33;
-const uint32_t CARLA_URI_MAP_ID_TIME_BEAT              = 34;
-const uint32_t CARLA_URI_MAP_ID_TIME_BEAT_UNIT         = 35;
-const uint32_t CARLA_URI_MAP_ID_TIME_BEATS_PER_BAR     = 36;
-const uint32_t CARLA_URI_MAP_ID_TIME_BEATS_PER_MINUTE  = 37;
-const uint32_t CARLA_URI_MAP_ID_TIME_FRAME             = 38;
-const uint32_t CARLA_URI_MAP_ID_TIME_FRAMES_PER_SECOND = 39;
-const uint32_t CARLA_URI_MAP_ID_TIME_SPEED             = 40;
-const uint32_t CARLA_URI_MAP_ID_TIME_TICKS_PER_BEAT    = 41;
-const uint32_t CARLA_URI_MAP_ID_MIDI_EVENT             = 42;
-const uint32_t CARLA_URI_MAP_ID_PARAM_SAMPLE_RATE      = 43;
-const uint32_t CARLA_URI_MAP_ID_UI_WINDOW_TITLE        = 44;
-const uint32_t CARLA_URI_MAP_ID_CARLA_ATOM_WORKER      = 45;
-const uint32_t CARLA_URI_MAP_ID_CARLA_TRANSIENT_WIN_ID = 46;
-const uint32_t CARLA_URI_MAP_ID_COUNT                  = 47;
+const uint32_t CARLA_URI_MAP_ID_BUF_NOMINAL_LENGTH     = 26;
+const uint32_t CARLA_URI_MAP_ID_BUF_SEQUENCE_SIZE      = 27;
+const uint32_t CARLA_URI_MAP_ID_LOG_ERROR              = 28;
+const uint32_t CARLA_URI_MAP_ID_LOG_NOTE               = 29;
+const uint32_t CARLA_URI_MAP_ID_LOG_TRACE              = 30;
+const uint32_t CARLA_URI_MAP_ID_LOG_WARNING            = 31;
+const uint32_t CARLA_URI_MAP_ID_TIME_POSITION          = 32; // base type
+const uint32_t CARLA_URI_MAP_ID_TIME_BAR               = 33; // values
+const uint32_t CARLA_URI_MAP_ID_TIME_BAR_BEAT          = 34;
+const uint32_t CARLA_URI_MAP_ID_TIME_BEAT              = 35;
+const uint32_t CARLA_URI_MAP_ID_TIME_BEAT_UNIT         = 36;
+const uint32_t CARLA_URI_MAP_ID_TIME_BEATS_PER_BAR     = 37;
+const uint32_t CARLA_URI_MAP_ID_TIME_BEATS_PER_MINUTE  = 38;
+const uint32_t CARLA_URI_MAP_ID_TIME_FRAME             = 39;
+const uint32_t CARLA_URI_MAP_ID_TIME_FRAMES_PER_SECOND = 40;
+const uint32_t CARLA_URI_MAP_ID_TIME_SPEED             = 41;
+const uint32_t CARLA_URI_MAP_ID_TIME_TICKS_PER_BEAT    = 42;
+const uint32_t CARLA_URI_MAP_ID_MIDI_EVENT             = 43;
+const uint32_t CARLA_URI_MAP_ID_PARAM_SAMPLE_RATE      = 44;
+const uint32_t CARLA_URI_MAP_ID_UI_WINDOW_TITLE        = 45;
+const uint32_t CARLA_URI_MAP_ID_CARLA_ATOM_WORKER      = 46;
+const uint32_t CARLA_URI_MAP_ID_CARLA_TRANSIENT_WIN_ID = 47;
+const uint32_t CARLA_URI_MAP_ID_COUNT                  = 48;
 
 // LV2 Feature Ids
 const uint32_t kFeatureIdLogs             =  0;
@@ -113,6 +114,7 @@ struct Lv2PluginOptions {
     enum OptIndex {
         MaxBlockLenth = 0,
         MinBlockLenth,
+        NominalBlockLenth,
         SequenceSize,
         SampleRate,
         FrontendWinId,
@@ -123,6 +125,7 @@ struct Lv2PluginOptions {
 
     int maxBufferSize;
     int minBufferSize;
+    int nominalBufferSize;
     int sequenceSize;
     double sampleRate;
     int64_t frontendWinId;
@@ -132,6 +135,7 @@ struct Lv2PluginOptions {
     Lv2PluginOptions() noexcept
         : maxBufferSize(0),
           minBufferSize(0),
+          nominalBufferSize(0),
           sequenceSize(MAX_DEFAULT_BUFFER_SIZE),
           sampleRate(0.0),
           frontendWinId(0),
@@ -152,6 +156,14 @@ struct Lv2PluginOptions {
         optMinBlockLenth.size    = sizeof(int);
         optMinBlockLenth.type    = CARLA_URI_MAP_ID_ATOM_INT;
         optMinBlockLenth.value   = &minBufferSize;
+
+        LV2_Options_Option& optNominalBlockLenth(opts[NominalBlockLenth]);
+        optNominalBlockLenth.context = LV2_OPTIONS_INSTANCE;
+        optNominalBlockLenth.subject = 0;
+        optNominalBlockLenth.key     = CARLA_URI_MAP_ID_BUF_NOMINAL_LENGTH;
+        optNominalBlockLenth.size    = sizeof(int);
+        optNominalBlockLenth.type    = CARLA_URI_MAP_ID_ATOM_INT;
+        optNominalBlockLenth.value   = &nominalBufferSize;
 
         LV2_Options_Option& optSequenceSize(opts[SequenceSize]);
         optSequenceSize.context = LV2_OPTIONS_INSTANCE;
@@ -212,8 +224,7 @@ public:
           fLv2Options(),
           fUiOptions(),
           fCustomURIDs(),
-          fExt(),
-          leakDetector_CarlaLv2Client()
+          fExt()
     {
         carla_zeroPointers(fFeatures, kFeatureCount+1);
 
@@ -223,9 +234,10 @@ public:
         // ---------------------------------------------------------------
         // initialize options
 
-        fLv2Options.minBufferSize = gBufferSize;
-        fLv2Options.maxBufferSize = gBufferSize;
-        fLv2Options.sampleRate    = gSampleRate;
+        fLv2Options.minBufferSize     = gBufferSize;
+        fLv2Options.maxBufferSize     = gBufferSize;
+        fLv2Options.nominalBufferSize = gBufferSize;
+        fLv2Options.sampleRate        = gSampleRate;
 
         // ---------------------------------------------------------------
         // initialize features (part 1)
@@ -361,7 +373,7 @@ public:
             }
         }
 
-        for (LinkedList<const char*>::Itenerator it = fCustomURIDs.begin(); it.valid(); it.next())
+        for (LinkedList<const char*>::Itenerator it = fCustomURIDs.begin2(); it.valid(); it.next())
         {
             const char* const uri(it.getValue(nullptr));
 
@@ -422,6 +434,7 @@ public:
 #if defined(BRIDGE_COCOA) || defined(BRIDGE_HWND) || defined(BRIDGE_X11)
         // embed UIs can only be resizable if they provide resize extension
         fUiOptions.isResizable = false;
+        // TODO: put this trick into main carla
 
         for (uint32_t i=0; i < fRdfUiDescriptor->ExtensionCount; ++i)
         {
@@ -503,15 +516,18 @@ public:
 
         if (fDescriptor->extension_data != nullptr)
         {
-            fExt.programs = (const LV2_Programs_UI_Interface*)fDescriptor->extension_data(LV2_PROGRAMS__UIInterface);
             fExt.options  = (const LV2_Options_Interface*)fDescriptor->extension_data(LV2_OPTIONS__interface);
+            fExt.programs = (const LV2_Programs_UI_Interface*)fDescriptor->extension_data(LV2_PROGRAMS__UIInterface);
             fExt.idle     = (const LV2UI_Idle_Interface*)fDescriptor->extension_data(LV2_UI__idleInterface);
+            fExt.resize   = (const LV2UI_Resize*)fDescriptor->extension_data(LV2_UI__resize);
 
             // check if invalid
             if (fExt.programs != nullptr && fExt.programs->select_program == nullptr)
                 fExt.programs = nullptr;
             if (fExt.idle != nullptr && fExt.idle->idle == nullptr)
                 fExt.idle = nullptr;
+            if (fExt.resize != nullptr && fExt.resize->ui_resize == nullptr)
+                fExt.resize = nullptr;
         }
 
         return true;
@@ -620,6 +636,12 @@ public:
         fUiOptions.transientWindowId = transientWindowId;
     }
 
+    void uiResized(const uint width, const uint height) override
+    {
+        if (fHandle != nullptr && fExt.resize != nullptr)
+            fExt.resize->ui_resize(fHandle, static_cast<int>(width), static_cast<int>(height));
+    }
+
     // ---------------------------------------------------------------------
 
     LV2_URID getCustomURID(const char* const uri)
@@ -654,11 +676,12 @@ public:
 
     const char* getCustomURIDString(const LV2_URID urid) const noexcept
     {
-        CARLA_SAFE_ASSERT_RETURN(urid != CARLA_URI_MAP_ID_NULL, nullptr);
-        CARLA_SAFE_ASSERT_RETURN(urid < fCustomURIDs.count(), nullptr);
+        static const char* const sFallback = "urn:null";
+        CARLA_SAFE_ASSERT_RETURN(urid != CARLA_URI_MAP_ID_NULL, sFallback);
+        CARLA_SAFE_ASSERT_RETURN(urid < fCustomURIDs.count(), sFallback);
         carla_debug("CarlaLv2Client::getCustomURIDString(%i)", urid);
 
-        return fCustomURIDs.getAt(urid, nullptr);
+        return fCustomURIDs.getAt(urid, sFallback);
     }
 
     // ---------------------------------------------------------------------
@@ -742,13 +765,15 @@ private:
 
     struct Extensions {
         const LV2_Options_Interface* options;
-        const LV2UI_Idle_Interface* idle;
         const LV2_Programs_UI_Interface* programs;
+        const LV2UI_Idle_Interface* idle;
+        const LV2UI_Resize* resize;
 
         Extensions()
             : options(nullptr),
+              programs(nullptr),
               idle(nullptr),
-              programs(nullptr) {}
+              resize(nullptr) {}
     } fExt;
 
     // -------------------------------------------------------------------
@@ -949,6 +974,8 @@ private:
             return CARLA_URI_MAP_ID_BUF_MAX_LENGTH;
         if (std::strcmp(uri, LV2_BUF_SIZE__minBlockLength) == 0)
             return CARLA_URI_MAP_ID_BUF_MIN_LENGTH;
+        if (std::strcmp(uri, LV2_BUF_SIZE__nominalBlockLength) == 0)
+            return CARLA_URI_MAP_ID_BUF_NOMINAL_LENGTH;
         if (std::strcmp(uri, LV2_BUF_SIZE__sequenceSize) == 0)
             return CARLA_URI_MAP_ID_BUF_SEQUENCE_SIZE;
 
@@ -1063,6 +1090,8 @@ private:
             return LV2_BUF_SIZE__maxBlockLength;
         if (urid == CARLA_URI_MAP_ID_BUF_MIN_LENGTH)
             return LV2_BUF_SIZE__minBlockLength;
+        if (urid == CARLA_URI_MAP_ID_BUF_NOMINAL_LENGTH)
+            return LV2_BUF_SIZE__nominalBlockLength;
         if (urid == CARLA_URI_MAP_ID_BUF_SEQUENCE_SIZE)
             return LV2_BUF_SIZE__sequenceSize;
 

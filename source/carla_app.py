@@ -25,11 +25,11 @@ from carla_config import *
 # Imports (Global)
 
 if config_UseQt5:
-    from PyQt5.QtCore import Qt, QSettings
+    from PyQt5.QtCore import Qt, QCoreApplication, QSettings
     from PyQt5.QtGui import QColor, QPalette
     from PyQt5.QtWidgets import QApplication
 else:
-    from PyQt4.QtCore import Qt, QSettings
+    from PyQt4.QtCore import Qt, QCoreApplication, QSettings
     from PyQt4.QtGui import QApplication, QColor, QPalette
 
 # ------------------------------------------------------------------------------------------------------------
@@ -45,12 +45,12 @@ class CarlaApplication(object):
 
         pathBinaries, pathResources = getPaths(libPrefix)
 
-        # Needed for MacOS LV2 plugin
-        if MACOS and os.path.exists(CWD):
+        # Needed for MacOS and Windows
+        if os.path.exists(CWD) and (MACOS or WINDOWS):
             QApplication.addLibraryPath(CWD)
 
         # Needed for local wine build
-        if WINDOWS and (CWD.endswith("source") or os.getenv("CXFREEZE") is not None):
+        if WINDOWS and CWD.endswith("source") and os.getenv("CXFREEZE") is None:
             QApplication.addLibraryPath("C:\\Python34\\Lib\\site-packages\\PyQt5\\plugins")
 
         # Use binary dir as library path (except in Windows)
@@ -79,6 +79,9 @@ class CarlaApplication(object):
 
         # create app
         self.createApp(appName)
+
+        if gCarla.nogui:
+            return
 
         self.fApp.setStyle("carla" if stylesDir else "fusion")
 
@@ -208,18 +211,29 @@ class CarlaApplication(object):
             self.fApp.setPalette(self.fPalBlue)
 
     def createApp(self, appName):
-        self.fApp = QApplication(sys.argv)
+        if LINUX:
+            # AA_X11InitThreads is not available on old PyQt versions
+            try:
+                attr = Qt.AA_X11InitThreads
+            except:
+                attr = 10
+            QApplication.setAttribute(attr)
+
+        if MACOS:
+            QApplication.setAttribute(Qt.AA_DontShowIconsInMenus)
+
+        self.fApp = QCoreApplication(sys.argv) if gCarla.nogui else QApplication(sys.argv)
         self.fApp.setApplicationName(appName)
         self.fApp.setApplicationVersion(VERSION)
         self.fApp.setOrganizationName("falkTX")
+
+        if gCarla.nogui:
+            return
 
         if appName.lower() == "carla-control":
             self.fApp.setWindowIcon(QIcon(":/scalable/carla-control.svg"))
         else:
             self.fApp.setWindowIcon(QIcon(":/scalable/carla.svg"))
-
-        if MACOS:
-            self.fApp.setAttribute(Qt.AA_DontShowIconsInMenus)
 
         print("Using \"%s\" theme" % self.fApp.style().objectName())
 

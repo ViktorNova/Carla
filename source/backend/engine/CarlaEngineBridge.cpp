@@ -1,6 +1,6 @@
 ﻿/*
  * Carla Plugin Host
- * Copyright (C) 2011-2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2011-2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -54,7 +54,7 @@ struct BridgeAudioPool {
         : filename(),
           data(nullptr)
     {
-        carla_zeroChar(shm, 64);
+        carla_zeroChars(shm, 64);
         jackbridge_shm_init(shm);
     }
 
@@ -106,7 +106,7 @@ struct BridgeRtClientControl : public CarlaRingBufferControl<SmallStackBuffer> {
         : filename(),
           data(nullptr)
     {
-        carla_zeroChar(shm, 64);
+        carla_zeroChars(shm, 64);
         jackbridge_shm_init(shm);
     }
 
@@ -162,18 +162,18 @@ struct BridgeRtClientControl : public CarlaRingBufferControl<SmallStackBuffer> {
         setRingBuffer(nullptr, false);
     }
 
-    bool postClient() noexcept
+    void postClient() noexcept
     {
-        CARLA_SAFE_ASSERT_RETURN(data != nullptr, false);
+        CARLA_SAFE_ASSERT_RETURN(data != nullptr,);
 
-        return jackbridge_sem_post(&data->sem.client);
+        jackbridge_sem_post(&data->sem.client);
     }
 
-    bool waitForServer(const uint secs, bool* const timedOut) noexcept
+    bool waitForServer(const uint secs) noexcept
     {
         CARLA_SAFE_ASSERT_RETURN(data != nullptr, false);
 
-        return jackbridge_sem_timedwait(&data->sem.server, secs, timedOut);
+        return jackbridge_sem_timedwait(&data->sem.server, secs);
     }
 
     PluginBridgeRtClientOpcode readOpcode() noexcept
@@ -195,7 +195,7 @@ struct BridgeNonRtClientControl : public CarlaRingBufferControl<BigStackBuffer> 
         : filename(),
           data(nullptr)
     {
-        carla_zeroChar(shm, 64);
+        carla_zeroChars(shm, 64);
         jackbridge_shm_init(shm);
     }
 
@@ -274,7 +274,7 @@ struct BridgeNonRtServerControl : public CarlaRingBufferControl<HugeStackBuffer>
            filename(),
            data(nullptr)
     {
-        carla_zeroChar(shm, 64);
+        carla_zeroChars(shm, 64);
         jackbridge_shm_init(shm);
     }
 
@@ -375,8 +375,7 @@ public:
           fShmNonRtServerControl(),
           fIsOffline(false),
           fFirstIdle(true),
-          fLastPingTime(-1),
-          leakDetector_CarlaEngineBridge()
+          fLastPingTime(-1)
     {
         carla_stdout("CarlaEngineBridge::CarlaEngineBridge(\"%s\", \"%s\", \"%s\", \"%s\")", audioPoolBaseName, rtClientBaseName, nonRtClientBaseName, nonRtServerBaseName);
 
@@ -574,27 +573,27 @@ public:
                 // uint/size, str[] (realName), uint/size, str[] (label), uint/size, str[] (maker), uint/size, str[] (copyright)
                 fShmNonRtServerControl.writeOpcode(kPluginBridgeNonRtServerPluginInfo2);
 
-                carla_zeroChar(bufStr, STR_MAX);
+                carla_zeroChars(bufStr, STR_MAX);
                 plugin->getRealName(bufStr);
-                bufStrSize = carla_fixValue(1U, 64U, static_cast<uint32_t>(std::strlen(bufStr)));
+                bufStrSize = carla_fixedValue(1U, 64U, static_cast<uint32_t>(std::strlen(bufStr)));
                 fShmNonRtServerControl.writeUInt(bufStrSize);
                 fShmNonRtServerControl.writeCustomData(bufStr, bufStrSize);
 
-                carla_zeroChar(bufStr, STR_MAX);
+                carla_zeroChars(bufStr, STR_MAX);
                 plugin->getLabel(bufStr);
-                bufStrSize = carla_fixValue(1U, 256U, static_cast<uint32_t>(std::strlen(bufStr)));
+                bufStrSize = carla_fixedValue(1U, 256U, static_cast<uint32_t>(std::strlen(bufStr)));
                 fShmNonRtServerControl.writeUInt(bufStrSize);
                 fShmNonRtServerControl.writeCustomData(bufStr, bufStrSize);
 
-                carla_zeroChar(bufStr, STR_MAX);
+                carla_zeroChars(bufStr, STR_MAX);
                 plugin->getMaker(bufStr);
-                bufStrSize = carla_fixValue(1U, 64U, static_cast<uint32_t>(std::strlen(bufStr)));
+                bufStrSize = carla_fixedValue(1U, 64U, static_cast<uint32_t>(std::strlen(bufStr)));
                 fShmNonRtServerControl.writeUInt(bufStrSize);
                 fShmNonRtServerControl.writeCustomData(bufStr, bufStrSize);
 
-                carla_zeroChar(bufStr, STR_MAX);
+                carla_zeroChars(bufStr, STR_MAX);
                 plugin->getCopyright(bufStr);
-                bufStrSize = carla_fixValue(1U, 64U, static_cast<uint32_t>(std::strlen(bufStr)));
+                bufStrSize = carla_fixedValue(1U, 64U, static_cast<uint32_t>(std::strlen(bufStr)));
                 fShmNonRtServerControl.writeUInt(bufStrSize);
                 fShmNonRtServerControl.writeCustomData(bufStr, bufStrSize);
 
@@ -656,21 +655,21 @@ public:
                         fShmNonRtServerControl.writeOpcode(kPluginBridgeNonRtServerParameterData2);
                         fShmNonRtServerControl.writeUInt(i);
 
-                        carla_zeroChar(bufStr, STR_MAX);
+                        carla_zeroChars(bufStr, STR_MAX);
                         plugin->getParameterName(i, bufStr);
-                        bufStrSize = carla_fixValue(1U, 32U, static_cast<uint32_t>(std::strlen(bufStr)));
+                        bufStrSize = carla_fixedValue(1U, 32U, static_cast<uint32_t>(std::strlen(bufStr)));
                         fShmNonRtServerControl.writeUInt(bufStrSize);
                         fShmNonRtServerControl.writeCustomData(bufStr, bufStrSize);
 
-                        carla_zeroChar(bufStr, STR_MAX);
+                        carla_zeroChars(bufStr, STR_MAX);
                         plugin->getParameterSymbol(i, bufStr);
-                        bufStrSize = carla_fixValue(1U, 64U, static_cast<uint32_t>(std::strlen(bufStr)));
+                        bufStrSize = carla_fixedValue(1U, 64U, static_cast<uint32_t>(std::strlen(bufStr)));
                         fShmNonRtServerControl.writeUInt(bufStrSize);
                         fShmNonRtServerControl.writeCustomData(bufStr, bufStrSize);
 
-                        carla_zeroChar(bufStr, STR_MAX);
+                        carla_zeroChars(bufStr, STR_MAX);
                         plugin->getParameterUnit(i, bufStr);
-                        bufStrSize = carla_fixValue(1U, 32U, static_cast<uint32_t>(std::strlen(bufStr)));
+                        bufStrSize = carla_fixedValue(1U, 32U, static_cast<uint32_t>(std::strlen(bufStr)));
                         fShmNonRtServerControl.writeUInt(bufStrSize);
                         fShmNonRtServerControl.writeCustomData(bufStr, bufStrSize);
 
@@ -720,9 +719,9 @@ public:
                     fShmNonRtServerControl.writeOpcode(kPluginBridgeNonRtServerProgramName);
                     fShmNonRtServerControl.writeUInt(i);
 
-                    carla_zeroChar(bufStr, STR_MAX);
+                    carla_zeroChars(bufStr, STR_MAX);
                     plugin->getProgramName(i, bufStr);
-                    bufStrSize = carla_fixValue(1U, 32U, static_cast<uint32_t>(std::strlen(bufStr)));
+                    bufStrSize = carla_fixedValue(1U, 32U, static_cast<uint32_t>(std::strlen(bufStr)));
                     fShmNonRtServerControl.writeUInt(bufStrSize);
                     fShmNonRtServerControl.writeCustomData(bufStr, bufStrSize);
 
@@ -750,7 +749,7 @@ public:
                     fShmNonRtServerControl.writeUInt(mpData.bank);
                     fShmNonRtServerControl.writeUInt(mpData.program);
 
-                    bufStrSize = carla_fixValue(1U, 32U, static_cast<uint32_t>(std::strlen(mpData.name)));
+                    bufStrSize = carla_fixedValue(1U, 32U, static_cast<uint32_t>(std::strlen(mpData.name)));
                     fShmNonRtServerControl.writeUInt(bufStrSize);
                     fShmNonRtServerControl.writeCustomData(mpData.name, bufStrSize);
 
@@ -794,9 +793,9 @@ public:
             handleNonRtData();
         } CARLA_SAFE_EXCEPTION("handleNonRtData");
 
-        if (fLastPingTime > 0 && Time::currentTimeMillis() > fLastPingTime + 5000 && ! wasFirstIdle)
+        if (fLastPingTime > 0 && Time::currentTimeMillis() > fLastPingTime + 30000 && ! wasFirstIdle)
         {
-            carla_stderr("Did not receive ping message from server for 5 secs, closing...");
+            carla_stderr("Did not receive ping message from server for 30 secs, closing...");
             callback(ENGINE_CALLBACK_QUIT, 0, 0, 0, 0.0f, nullptr);
         }
     }
@@ -989,19 +988,19 @@ public:
                 // type
                 const uint32_t typeSize(fShmNonRtClientControl.readUInt());
                 char typeStr[typeSize+1];
-                carla_zeroChar(typeStr, typeSize+1);
+                carla_zeroChars(typeStr, typeSize+1);
                 fShmNonRtClientControl.readCustomData(typeStr, typeSize);
 
                 // key
                 const uint32_t keySize(fShmNonRtClientControl.readUInt());
                 char keyStr[keySize+1];
-                carla_zeroChar(keyStr, keySize+1);
+                carla_zeroChars(keyStr, keySize+1);
                 fShmNonRtClientControl.readCustomData(keyStr, keySize);
 
                 // value
                 const uint32_t valueSize(fShmNonRtClientControl.readUInt());
                 char valueStr[valueSize+1];
-                carla_zeroChar(valueStr, valueSize+1);
+                carla_zeroChars(valueStr, valueSize+1);
                 fShmNonRtClientControl.readCustomData(valueStr, valueSize);
 
                 if (plugin != nullptr && plugin->isEnabled())
@@ -1014,7 +1013,7 @@ public:
                 CARLA_SAFE_ASSERT_BREAK(size > 0);
 
                 char chunkFilePathTry[size+1];
-                carla_zeroChar(chunkFilePathTry, size+1);
+                carla_zeroChars(chunkFilePathTry, size+1);
                 fShmNonRtClientControl.readCustomData(chunkFilePathTry, size);
 
                 CARLA_SAFE_ASSERT_BREAK(chunkFilePathTry[0] != '\0');
@@ -1204,18 +1203,20 @@ public:
 protected:
     void run() override
     {
-        bool timedOut, quitReceived = false;
+        bool timedOut = false;
+        bool quitReceived = false;
 
         for (; ! shouldThreadExit();)
         {
-            if (! fShmRtClientControl.waitForServer(5, &timedOut))
+            if (! fShmRtClientControl.waitForServer(5))
             {
-                /*
-                * As a special case we ignore timeouts for plugin bridges.
-                * Some big Windows plugins (Kontakt, FL Studio VST) can time out when initializing or doing UI stuff.
-                * If any other error happens the plugin bridge is stopped.
-                */
-                if (timedOut) continue;
+                // Give engine 1 more change to catch up.
+                if (! timedOut)
+                {
+                    carla_stderr2("Bridge timed-out, giving it one more chance");
+                    timedOut = true;
+                    continue;
+                }
 
                 carla_stderr2("Bridge timed-out, final post...");
                 fShmRtClientControl.postClient();
@@ -1223,6 +1224,8 @@ protected:
                 signalThreadShouldExit();
                 break;
             }
+
+            timedOut = false;
 
             for (; fShmRtClientControl.isDataAvailableForReading();)
             {
@@ -1430,7 +1433,7 @@ protected:
                     std::size_t curMidiDataPos = 0;
 
                     if (pData->events.in[0].type != kEngineEventTypeNull)
-                        carla_zeroStruct<EngineEvent>(pData->events.in,  kMaxEngineEventInternalCount);
+                        carla_zeroStructs(pData->events.in,  kMaxEngineEventInternalCount);
 
                     if (pData->events.out[0].type != kEngineEventTypeNull)
                     {
@@ -1490,7 +1493,7 @@ protected:
                             }
                         }
 
-                        carla_zeroStruct<EngineEvent>(pData->events.out, kMaxEngineEventInternalCount);
+                        carla_zeroStructs(pData->events.out, kMaxEngineEventInternalCount);
                     }
 
                 }   break;
@@ -1502,8 +1505,7 @@ protected:
                 }
             }
 
-            if (! fShmRtClientControl.postClient())
-                carla_stderr2("Could not post to client rt semaphore");
+            fShmRtClientControl.postClient();
         }
 
         callback(ENGINE_CALLBACK_ENGINE_STOPPED, 0, 0, 0, 0.0f, nullptr);

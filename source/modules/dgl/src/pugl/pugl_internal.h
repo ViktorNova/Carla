@@ -46,7 +46,6 @@ typedef struct PuglInternalsImpl PuglInternals;
 
 struct PuglViewImpl {
 	PuglHandle       handle;
-	PuglEventFunc    eventFunc;
 	PuglCloseFunc    closeFunc;
 	PuglDisplayFunc  displayFunc;
 	PuglKeyboardFunc keyboardFunc;
@@ -55,14 +54,18 @@ struct PuglViewImpl {
 	PuglReshapeFunc  reshapeFunc;
 	PuglScrollFunc   scrollFunc;
 	PuglSpecialFunc  specialFunc;
+	PuglFileSelectedFunc fileSelectedFunc;
 
 	PuglInternals* impl;
 
 	PuglNativeWindow parent;
 	PuglContextType  ctx_type;
+	uintptr_t        transient_parent;
 
 	int      width;
 	int      height;
+	int      min_width;
+	int      min_height;
 	int      mods;
 	bool     mouse_in_view;
 	bool     ignoreKeyRepeat;
@@ -71,10 +74,10 @@ struct PuglViewImpl {
 	uint32_t event_timestamp_ms;
 };
 
-PuglInternals* puglInitInternals();
+PuglInternals* puglInitInternals(void);
 
 PuglView*
-puglInit(int* pargc, char** argv)
+puglInit(void)
 {
 	PuglView* view = (PuglView*)calloc(1, sizeof(PuglView));
 	if (!view) {
@@ -92,9 +95,6 @@ puglInit(int* pargc, char** argv)
 	view->height = 480;
 
 	return view;
-
-	// unused
-	(void)pargc; (void)argv;
 }
 
 void
@@ -105,15 +105,28 @@ puglInitWindowSize(PuglView* view, int width, int height)
 }
 
 void
+puglInitWindowMinSize(PuglView* view, int width, int height)
+{
+	view->min_width  = width;
+	view->min_height = height;
+}
+
+void
 puglInitWindowParent(PuglView* view, PuglNativeWindow parent)
 {
 	view->parent = parent;
 }
 
 void
-puglInitResizable(PuglView* view, bool resizable)
+puglInitUserResizable(PuglView* view, bool resizable)
 {
 	view->resizable = resizable;
+}
+
+void
+puglInitTransientFor(PuglView* view, uintptr_t parent)
+{
+	view->transient_parent = parent;
 }
 
 void
@@ -150,12 +163,6 @@ void
 puglIgnoreKeyRepeat(PuglView* view, bool ignore)
 {
 	view->ignoreKeyRepeat = ignore;
-}
-
-void
-puglSetEventFunc(PuglView* view, PuglEventFunc eventFunc)
-{
-	view->eventFunc = eventFunc;
 }
 
 void
@@ -207,11 +214,70 @@ puglSetSpecialFunc(PuglView* view, PuglSpecialFunc specialFunc)
 }
 
 void
+puglSetFileSelectedFunc(PuglView* view, PuglFileSelectedFunc fileSelectedFunc)
+{
+	view->fileSelectedFunc = fileSelectedFunc;
+}
+
+void
 puglEnterContext(PuglView* view);
 
 void
 puglLeaveContext(PuglView* view, bool flush);
 
+#if 0
+/** Return the code point for buf, or the replacement character on error. */
+static uint32_t
+puglDecodeUTF8(const uint8_t* buf)
+{
+#define FAIL_IF(cond) { if (cond) return 0xFFFD; }
+
+	/* http://en.wikipedia.org/wiki/UTF-8 */
+
+	if (buf[0] < 0x80) {
+		return buf[0];
+	} else if (buf[0] < 0xC2) {
+		return 0xFFFD;
+	} else if (buf[0] < 0xE0) {
+		FAIL_IF((buf[1] & 0xC0) != 0x80);
+		return (buf[0] << 6) + buf[1] - 0x3080;
+	} else if (buf[0] < 0xF0) {
+		FAIL_IF((buf[1] & 0xC0) != 0x80);
+		FAIL_IF(buf[0] == 0xE0 && buf[1] < 0xA0);
+		FAIL_IF((buf[2] & 0xC0) != 0x80);
+		return (buf[0] << 12) + (buf[1] << 6) + buf[2] - 0xE2080;
+	} else if (buf[0] < 0xF5) {
+		FAIL_IF((buf[1] & 0xC0) != 0x80);
+		FAIL_IF(buf[0] == 0xF0 && buf[1] < 0x90);
+		FAIL_IF(buf[0] == 0xF4 && buf[1] >= 0x90);
+		FAIL_IF((buf[2] & 0xC0) != 0x80);
+		FAIL_IF((buf[3] & 0xC0) != 0x80);
+		return ((buf[0] << 18) +
+		        (buf[1] << 12) +
+		        (buf[2] << 6) +
+		        buf[3] - 0x3C82080);
+	}
+	return 0xFFFD;
+}
+#endif
+
+static void
+puglDefaultReshape(PuglView* view, int width, int height)
+{
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, width, height, 0, 0, 1);
+	glViewport(0, 0, width, height);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	return;
+
+	// unused
+	(void)view;
+}
+
+#if 0
 static void
 puglDispatchEvent(PuglView* view, const PuglEvent* event)
 {
@@ -283,3 +349,4 @@ puglDispatchEvent(PuglView* view, const PuglEvent* event)
 		break;
 	}
 }
+#endif

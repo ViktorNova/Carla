@@ -37,13 +37,6 @@ struct RawMidiEvent {
     uint64_t time;
     uint8_t  size;
     uint8_t  data[MAX_EVENT_DATA_SIZE];
-
-    RawMidiEvent() noexcept
-        : time(0),
-          size(0)
-    {
-        carla_zeroBytes(data, MAX_EVENT_DATA_SIZE);
-    }
 };
 
 // -----------------------------------------------------------------------
@@ -52,7 +45,7 @@ class AbstractMidiPlayer
 {
 public:
     virtual ~AbstractMidiPlayer() {}
-    virtual void writeMidiEvent(const uint8_t port, const uint64_t timePosFrame, const RawMidiEvent* const event) = 0;
+    virtual void writeMidiEvent(const uint8_t port, const long double timePosFrame, const RawMidiEvent* const event) = 0;
 };
 
 // -----------------------------------------------------------------------
@@ -65,8 +58,7 @@ public:
           fMidiPort(0),
           fStartTime(0),
           fMutex(),
-          fData(),
-          leakDetector_MidiPattern()
+          fData()
     {
         CARLA_SAFE_ASSERT(kPlayer != nullptr);
     }
@@ -84,7 +76,7 @@ public:
         RawMidiEvent* const ctrlEvent(new RawMidiEvent());
         ctrlEvent->time    = time;
         ctrlEvent->size    = 3;
-        ctrlEvent->data[0] = uint8_t(MIDI_STATUS_CONTROL_CHANGE | (channel & 0x0F));
+        ctrlEvent->data[0] = uint8_t(MIDI_STATUS_CONTROL_CHANGE | (channel & MIDI_CHANNEL_BIT));
         ctrlEvent->data[1] = control;
         ctrlEvent->data[2] = value;
 
@@ -96,7 +88,7 @@ public:
         RawMidiEvent* const pressureEvent(new RawMidiEvent());
         pressureEvent->time    = time;
         pressureEvent->size    = 2;
-        pressureEvent->data[0] = uint8_t(MIDI_STATUS_CHANNEL_PRESSURE | (channel & 0x0F));
+        pressureEvent->data[0] = uint8_t(MIDI_STATUS_CHANNEL_PRESSURE | (channel & MIDI_CHANNEL_BIT));
         pressureEvent->data[1] = pressure;
 
         appendSorted(pressureEvent);
@@ -113,7 +105,7 @@ public:
         RawMidiEvent* const noteOnEvent(new RawMidiEvent());
         noteOnEvent->time    = time;
         noteOnEvent->size    = 3;
-        noteOnEvent->data[0] = uint8_t(MIDI_STATUS_NOTE_ON | (channel & 0x0F));
+        noteOnEvent->data[0] = uint8_t(MIDI_STATUS_NOTE_ON | (channel & MIDI_CHANNEL_BIT));
         noteOnEvent->data[1] = pitch;
         noteOnEvent->data[2] = velocity;
 
@@ -125,7 +117,7 @@ public:
         RawMidiEvent* const noteOffEvent(new RawMidiEvent());
         noteOffEvent->time    = time;
         noteOffEvent->size    = 3;
-        noteOffEvent->data[0] = uint8_t(MIDI_STATUS_NOTE_OFF | (channel & 0x0F));
+        noteOffEvent->data[0] = uint8_t(MIDI_STATUS_NOTE_OFF | (channel & MIDI_CHANNEL_BIT));
         noteOffEvent->data[1] = pitch;
         noteOffEvent->data[2] = velocity;
 
@@ -137,7 +129,7 @@ public:
         RawMidiEvent* const noteAfterEvent(new RawMidiEvent());
         noteAfterEvent->time    = time;
         noteAfterEvent->size    = 3;
-        noteAfterEvent->data[0] = uint8_t(MIDI_STATUS_POLYPHONIC_AFTERTOUCH | (channel & 0x0F));
+        noteAfterEvent->data[0] = uint8_t(MIDI_STATUS_POLYPHONIC_AFTERTOUCH | (channel & MIDI_CHANNEL_BIT));
         noteAfterEvent->data[1] = pitch;
         noteAfterEvent->data[2] = pressure;
 
@@ -149,14 +141,14 @@ public:
         RawMidiEvent* const bankEvent(new RawMidiEvent());
         bankEvent->time    = time;
         bankEvent->size    = 3;
-        bankEvent->data[0] = uint8_t(MIDI_STATUS_CONTROL_CHANGE | (channel & 0x0F));
+        bankEvent->data[0] = uint8_t(MIDI_STATUS_CONTROL_CHANGE | (channel & MIDI_CHANNEL_BIT));
         bankEvent->data[1] = MIDI_CONTROL_BANK_SELECT;
         bankEvent->data[2] = bank;
 
         RawMidiEvent* const programEvent(new RawMidiEvent());
         programEvent->time    = time;
         programEvent->size    = 2;
-        programEvent->data[0] = uint8_t(MIDI_STATUS_PROGRAM_CHANGE | (channel & 0x0F));
+        programEvent->data[0] = uint8_t(MIDI_STATUS_PROGRAM_CHANGE | (channel & MIDI_CHANNEL_BIT));
         programEvent->data[1] = program;
 
         appendSorted(bankEvent);
@@ -168,7 +160,7 @@ public:
         RawMidiEvent* const pressureEvent(new RawMidiEvent());
         pressureEvent->time    = time;
         pressureEvent->size    = 3;
-        pressureEvent->data[0] = uint8_t(MIDI_STATUS_PITCH_WHEEL_CONTROL | (channel & 0x0F));
+        pressureEvent->data[0] = uint8_t(MIDI_STATUS_PITCH_WHEEL_CONTROL | (channel & MIDI_CHANNEL_BIT));
         pressureEvent->data[1] = lsb;
         pressureEvent->data[2] = msb;
 
@@ -193,7 +185,7 @@ public:
     {
         const CarlaMutexLocker sl(fMutex);
 
-        for (LinkedList<const RawMidiEvent*>::Itenerator it = fData.begin(); it.valid(); it.next())
+        for (LinkedList<const RawMidiEvent*>::Itenerator it = fData.begin2(); it.valid(); it.next())
         {
             const RawMidiEvent* const rawMidiEvent(it.getValue(nullptr));
             CARLA_SAFE_ASSERT_CONTINUE(rawMidiEvent != nullptr);
@@ -221,7 +213,7 @@ public:
     {
         const CarlaMutexLocker sl(fMutex);
 
-        for (LinkedList<const RawMidiEvent*>::Itenerator it = fData.begin(); it.valid(); it.next())
+        for (LinkedList<const RawMidiEvent*>::Itenerator it = fData.begin2(); it.valid(); it.next())
             delete it.getValue(nullptr);
 
         fData.clear();
@@ -230,14 +222,20 @@ public:
     // -------------------------------------------------------------------
     // play on time
 
-    void play(uint64_t timePosFrame, const uint32_t frames)
+    void play(const uint64_t timePosFrame, const uint32_t frames)
+    {
+        play(static_cast<long double>(timePosFrame), static_cast<double>(frames));
+    }
+
+    void play(long double timePosFrame, const double frames)
     {
         if (! fMutex.tryLock())
             return;
 
-        timePosFrame += fStartTime;
+        if (fStartTime != 0)
+            timePosFrame += static_cast<long double>(fStartTime);
 
-        for (LinkedList<const RawMidiEvent*>::Itenerator it = fData.begin(); it.valid(); it.next())
+        for (LinkedList<const RawMidiEvent*>::Itenerator it = fData.begin2(); it.valid(); it.next())
         {
             const RawMidiEvent* const rawMidiEvent(it.getValue(nullptr));
             CARLA_SAFE_ASSERT_CONTINUE(rawMidiEvent != nullptr);
@@ -247,7 +245,7 @@ public:
             if (timePosFrame + frames <= rawMidiEvent->time)
                 continue;
 
-            kPlayer->writeMidiEvent(fMidiPort, timePosFrame, rawMidiEvent);
+            kPlayer->writeMidiEvent(fMidiPort, static_cast<long double>(rawMidiEvent->time)-timePosFrame, rawMidiEvent);
         }
 
         fMutex.unlock();
@@ -276,7 +274,143 @@ public:
 
     LinkedList<const RawMidiEvent*>::Itenerator iteneratorBegin() const noexcept
     {
-        return fData.begin();
+        return fData.begin2();
+    }
+
+    // -------------------------------------------------------------------
+    // state
+
+    char* getState() const
+    {
+        static const std::size_t maxTimeSize = 20;                        // std::strlen("18446744073709551615");
+        static const std::size_t maxDataSize = 4 + 4*MAX_EVENT_DATA_SIZE; // std::strlen("0xFF:127:127:127");
+        static const std::size_t maxMsgSize  = maxTimeSize + 3 /* sep + size + sep */ + maxDataSize + 1 /* newline */;
+
+        const CarlaMutexLocker sl(fMutex);
+
+        if (fData.count() == 0)
+            return nullptr;
+
+        char* const data((char*)std::calloc(1, fData.count()*maxMsgSize));
+        CARLA_SAFE_ASSERT_RETURN(data != nullptr, nullptr);
+
+        char* dataWrtn = data;
+        int wrtn;
+
+        for (LinkedList<const RawMidiEvent*>::Itenerator it = fData.begin2(); it.valid(); it.next())
+        {
+            const RawMidiEvent* const rawMidiEvent(it.getValue(nullptr));
+            CARLA_SAFE_ASSERT_CONTINUE(rawMidiEvent != nullptr);
+
+            wrtn = std::snprintf(dataWrtn, maxTimeSize+4, P_INT64 ":%i:", rawMidiEvent->time, rawMidiEvent->size);
+            CARLA_SAFE_ASSERT_BREAK(wrtn > 0);
+            dataWrtn += wrtn;
+
+            wrtn = std::snprintf(dataWrtn, 5, "0x%02X", rawMidiEvent->data[0]);
+            CARLA_SAFE_ASSERT_BREAK(wrtn > 0);
+            dataWrtn += wrtn;
+
+            for (uint8_t i=1, size=rawMidiEvent->size; i<size; ++i)
+            {
+                wrtn = std::snprintf(dataWrtn, 5, ":%03u", rawMidiEvent->data[i]);
+                CARLA_SAFE_ASSERT_BREAK(wrtn > 0);
+                dataWrtn += wrtn;
+            }
+
+            *dataWrtn++ = '\n';
+        }
+
+        *dataWrtn = '\0';
+
+        return data;
+    }
+
+    void setState(const char* const data)
+    {
+        CARLA_SAFE_ASSERT_RETURN(data != nullptr,);
+
+        const char* dataRead = data;
+        const char* needle;
+        RawMidiEvent midiEvent;
+        char    tmpBuf[24];
+        ssize_t tmpSize;
+
+        clear();
+
+        const CarlaMutexLocker sl(fMutex);
+
+        for (; *dataRead != '\0';)
+        {
+            // get time
+            needle = std::strchr(dataRead, ':');
+
+            if (needle == nullptr)
+                return;
+
+            carla_zeroStruct(midiEvent);
+
+            tmpSize = needle - dataRead;
+            CARLA_SAFE_ASSERT_RETURN(tmpSize > 0 && tmpSize < 24,);
+
+            std::strncpy(tmpBuf, dataRead, static_cast<size_t>(tmpSize));
+            tmpBuf[tmpSize] = '\0';
+            dataRead += tmpSize+1;
+
+            const long long time = std::atoll(tmpBuf);
+            CARLA_SAFE_ASSERT_RETURN(time >= 0,);
+
+            midiEvent.time = static_cast<uint64_t>(time);
+
+            // get size
+            needle = std::strchr(dataRead, ':');
+            CARLA_SAFE_ASSERT_RETURN(needle != nullptr,);
+
+            tmpSize = needle - dataRead;
+            CARLA_SAFE_ASSERT_RETURN(tmpSize > 0 && tmpSize < 24,);
+
+            std::strncpy(tmpBuf, dataRead, static_cast<size_t>(tmpSize));
+            tmpBuf[tmpSize] = '\0';
+            dataRead += tmpSize+1;
+
+            const int size = std::atoi(tmpBuf);
+            CARLA_SAFE_ASSERT_RETURN(size > 0 && size <= MAX_EVENT_DATA_SIZE,);
+
+            midiEvent.size = static_cast<uint8_t>(size);
+
+            // get events
+            for (int i=0; i<size; ++i)
+            {
+                CARLA_SAFE_ASSERT_RETURN(dataRead-data >= 4,);
+
+                tmpSize = i==0 ? 4 : 3;
+
+                std::strncpy(tmpBuf, dataRead, static_cast<size_t>(tmpSize));
+                tmpBuf[tmpSize] = '\0';
+                dataRead += tmpSize+1;
+
+                long mdata;
+
+                if (i == 0)
+                {
+                    mdata = std::strtol(tmpBuf, nullptr, 16);
+                    CARLA_SAFE_ASSERT_RETURN(mdata >= 0x80 && mdata <= 0xFF,);
+                }
+                else
+                {
+                    mdata = std::atoi(tmpBuf);
+                    CARLA_SAFE_ASSERT_RETURN(mdata >= 0 && mdata < MAX_MIDI_VALUE,);
+                }
+
+                midiEvent.data[i] = static_cast<uint8_t>(mdata);
+            }
+
+            for (int i=size; i<MAX_EVENT_DATA_SIZE; ++i)
+                midiEvent.data[i] = 0;
+
+            RawMidiEvent* const event(new RawMidiEvent());
+            carla_copyStruct(*event, midiEvent);
+            fData.append(event);
+        }
     }
 
     // -------------------------------------------------------------------
@@ -300,7 +434,7 @@ private:
             return;
         }
 
-        for (LinkedList<const RawMidiEvent*>::Itenerator it = fData.begin(); it.valid(); it.next())
+        for (LinkedList<const RawMidiEvent*>::Itenerator it = fData.begin2(); it.valid(); it.next())
         {
             const RawMidiEvent* const oldEvent(it.getValue(nullptr));
             CARLA_SAFE_ASSERT_CONTINUE(oldEvent != nullptr);

@@ -14,47 +14,58 @@ BUILD_C_FLAGS   += -I..
 BUILD_CXX_FLAGS += -I.. -isystem $(CWD)/modules -I$(CWD)/modules/distrho
 
 # ----------------------------------------------------------------------------------------------------------------------------
-# Flags for _all.c
+# Flags for Zita UIs
 
-ALL_C_FLAGS  = $(BUILD_C_FLAGS)
-
-# DISTRHO ProM
-ifeq ($(HAVE_DGL),true)
-ifeq ($(HAVE_PROJECTM),true)
-ALL_C_FLAGS += -DWANT_DISTRHO_PROM
-endif
-endif
-
-# ZynAddSubFX
-ifeq ($(HAVE_ZYN_DEPS),true)
-ALL_C_FLAGS += -DWANT_ZYNADDSUBFX
-endif
-
-# Experimental plugins
 ifeq ($(EXPERIMENTAL_PLUGINS),true)
-ALL_C_FLAGS += -DWANT_EXPERIMENTAL_PLUGINS
-endif
+ZITA_DSP_CXX_FLAGS  = $(BUILD_CXX_FLAGS) -Wno-unused-parameter
+ZITA_DSP_CXX_FLAGS += $(shell pkg-config --cflags fftw3f)
+ZITA_UI_CXX_FLAGS   = $(BUILD_CXX_FLAGS) -Wno-unused-parameter -Wno-ignored-qualifiers
+ZITA_UI_CXX_FLAGS  += $(shell pkg-config --cflags cairo libpng12 freetype2 x11 xft zlib)
+ZITA_UI_LINK_FLAGS  = $(LINK_FLAGS) -lclxclient -lclthreads
+ZITA_UI_LINK_FLAGS += $(shell pkg-config --libs cairo libpng12 freetype2 x11 xft zlib)
+ZITA_UI_LINK_FLAGS += -ldl -lpthread -lrt
+endif # EXPERIMENTAL_PLUGINS
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Flags for ZynAddSubFX
 
 ifeq ($(HAVE_ZYN_DEPS),true)
-ZYN_CXX_FLAGS  = $(BUILD_CXX_FLAGS) -isystem zynaddsubfx
+ZYN_CXX_FLAGS  = $(BUILD_CXX_FLAGS) -Izynaddsubfx -Izynaddsubfx/rtosc
 ZYN_CXX_FLAGS += $(shell pkg-config --cflags fftw3 mxml zlib)
-ifneq ($(MACOS),true)
-ZYN_CXX_FLAGS += -DHAVE_SCHEDULER
+ZYN_LD_FLAGS   = $(shell pkg-config --libs liblo)
+ZYN_LD_FLAGS  += -ldl -lpthread -lrt
+ifeq ($(HAVE_X11),true)
+ZYN_CXX_FLAGS += $(shell pkg-config --cflags x11)
+ZYN_LD_FLAGS  += $(shell pkg-config --libs x11)
 endif
 ifeq ($(HAVE_ZYN_UI_DEPS),true)
-ZYN_CXX_FLAGS += -DNTK_GUI -DWANT_ZYNADDSUBFX_UI
+ifeq ($(HAVE_NTK),true)
+FLUID          = ntk-fluid
+ZYN_CXX_FLAGS += -DNTK_GUI
 ZYN_CXX_FLAGS += $(shell pkg-config --cflags ntk_images ntk)
-endif
-endif
+ZYN_LD_FLAGS  += $(shell pkg-config --libs ntk_images ntk)
+else # HAVE_NTK
+FLUID          = fluid
+ZYN_CXX_FLAGS += -DFLTK_GUI
+ZYN_CXX_FLAGS += $(shell fltk-config --use-images --cxxflags)
+ZYN_LD_FLAGS  += $(shell fltk-config --use-images --ldflags)
+endif # HAVE_NTK
+else  # HAVE_ZYN_UI_DEPS
+ZYN_CXX_FLAGS += -DNO_UI
+endif # HAVE_ZYN_UI_DEPS
+endif # HAVE_ZYN_DEPS
+
+# ----------------------------------------------------------------------------------------------------------------------------
+# Set targets
+
+TARGETS = $(MODULEDIR)/$(MODULENAME).a
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Set objects
 
 OBJS = \
-	$(OBJDIR)/_all.c.o
+	$(OBJDIR)/_all.c.o \
+	$(OBJDIR)/_data.cpp.o
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Simple plugins
@@ -62,17 +73,18 @@ OBJS = \
 OBJS += \
 	$(OBJDIR)/bypass.c.o \
 	$(OBJDIR)/lfo.c.o \
+	$(OBJDIR)/midi-channel-filter.c.o \
 	$(OBJDIR)/midi-gain.c.o \
+	$(OBJDIR)/midi-join.c.o \
 	$(OBJDIR)/midi-split.c.o \
 	$(OBJDIR)/midi-through.c.o \
-	$(OBJDIR)/midi-transpose.c.o \
-	$(OBJDIR)/nekofilter.c.o
+	$(OBJDIR)/midi-transpose.c.o
 
 OBJS += \
 	$(OBJDIR)/audio-file.cpp.o \
 	$(OBJDIR)/bigmeter.cpp.o \
 	$(OBJDIR)/midi-file.cpp.o \
-	$(OBJDIR)/midi-sequencer.cpp.o \
+	$(OBJDIR)/midi-pattern.cpp.o \
 	$(OBJDIR)/notes.cpp.o
 
 # ----------------------------------------------------------------------------------------------------------------------------
@@ -92,8 +104,16 @@ endif
 endif
 
 # ----------------------------------------------------------------------------------------------------------------------------
+# DISTRHO plugins (Juice)
+
+OBJS += \
+	$(OBJDIR)/distrho-vectorjuice.cpp.o \
+	$(OBJDIR)/distrho-wobblejuice.cpp.o
+
+# ----------------------------------------------------------------------------------------------------------------------------
 # ZynAddSubFX
 
+ifeq ($(LINUX),true)
 ifeq ($(HAVE_ZYN_DEPS),true)
 OBJS += \
 	$(OBJDIR)/zynaddsubfx-fx.cpp.o \
@@ -101,8 +121,7 @@ OBJS += \
 	$(OBJDIR)/zynaddsubfx-src.cpp.o
 
 ifeq ($(HAVE_ZYN_UI_DEPS),true)
-OBJS += \
-	$(OBJDIR)/zynaddsubfx-ui.cpp.o
+TARGETS += resources/zynaddsubfx-ui$(APP_EXT)
 
 ZYN_UI_FILES_CPP = \
 	zynaddsubfx/UI/ADnoteUI.cpp \
@@ -141,6 +160,7 @@ ZYN_UI_FILES_H = \
 	zynaddsubfx/UI/VirKeyboard.h
 endif
 endif
+endif
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # Experimental plugins
@@ -150,16 +170,21 @@ OBJS += \
 	$(OBJDIR)/zita-at1.cpp.o \
 	$(OBJDIR)/zita-bls1.cpp.o \
 	$(OBJDIR)/zita-rev1.cpp.o
+
+TARGETS += \
+	resources/at1-ui$(APP_EXT) \
+	resources/bls1-ui$(APP_EXT) \
+	resources/rev1-ui$(APP_EXT)
 endif
 
 # ----------------------------------------------------------------------------------------------------------------------------
 
-all: $(MODULEDIR)/$(MODULENAME).a
+all: $(TARGETS)
 
 # ----------------------------------------------------------------------------------------------------------------------------
 
 clean:
-	rm -f $(OBJDIR)/*.o $(MODULEDIR)/$(MODULENAME)*.a $(ZYN_UI_FILES_H) $(ZYN_UI_FILES_CPP)
+	rm -f $(OBJDIR)/*.o $(MODULEDIR)/$(MODULENAME)*.a $(ZYN_UI_FILES_H) $(ZYN_UI_FILES_CPP) $(TARGETS)
 
 debug:
 	$(MAKE) DEBUG=true
@@ -172,27 +197,74 @@ $(MODULEDIR)/$(MODULENAME).a: $(OBJS)
 	@rm -f $@
 	@$(AR) crs $@ $^
 
+resources/at1-ui$(APP_EXT): $(OBJDIR)/zita-at1-ui.cpp.o
+	-@mkdir -p $(OBJDIR)
+	@echo "Linking at1-ui"
+	@$(CXX) $^ $(ZITA_UI_LINK_FLAGS) -o $@
+
+resources/bls1-ui$(APP_EXT): $(OBJDIR)/zita-bls1-ui.cpp.o
+	-@mkdir -p $(OBJDIR)
+	@echo "Linking bls1-ui"
+	@$(CXX) $^ $(ZITA_UI_LINK_FLAGS) -o $@
+
+resources/rev1-ui$(APP_EXT): $(OBJDIR)/zita-rev1-ui.cpp.o
+	-@mkdir -p $(OBJDIR)
+	@echo "Linking rev1-ui"
+	@$(CXX) $^ $(ZITA_UI_LINK_FLAGS) -o $@
+
+resources/zynaddsubfx-ui$(APP_EXT): $(OBJDIR)/zynaddsubfx-ui.cpp.o
+	-@mkdir -p $(OBJDIR)
+	@echo "Linking zynaddsubfx-ui"
+	@$(CXX) $^ $(ZYN_LD_FLAGS) -o $@
+
 # ----------------------------------------------------------------------------------------------------------------------------
 
 zynaddsubfx/UI/%.cpp: zynaddsubfx/UI/%.fl
-	@echo "Generating $@/h"
-	@ntk-fluid -c -o zynaddsubfx/UI/$*.cpp -h zynaddsubfx/UI/$*.h $<
+	@echo "Generating $@|h"
+	@$(FLUID) -c -o zynaddsubfx/UI/$*.cpp -h zynaddsubfx/UI/$*.h $<
 
 zynaddsubfx/UI/%.h: zynaddsubfx/UI/%.fl
-	@echo "Generating $@/cpp"
-	@ntk-fluid -c -o zynaddsubfx/UI/$*.cpp -h zynaddsubfx/UI/$*.h $<
+	@echo "Generating $@|cpp"
+	@$(FLUID) -c -o zynaddsubfx/UI/$*.cpp -h zynaddsubfx/UI/$*.h $<
 
 # ----------------------------------------------------------------------------------------------------------------------------
-
-$(OBJDIR)/_all.c.o: _all.c
-	-@mkdir -p $(OBJDIR)
-	@echo "Compiling $<"
-	@$(CC) $< $(ALL_C_FLAGS) -c -o $@
 
 $(OBJDIR)/%.c.o: %.c
 	-@mkdir -p $(OBJDIR)
 	@echo "Compiling $<"
 	@$(CC) $< $(BUILD_C_FLAGS) -c -o $@
+
+# ----------------------------------------------------------------------------------------------------------------------------
+
+$(OBJDIR)/_data.cpp.o: _data.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling $<"
+	@$(CXX) $< $(BUILD_CXX_FLAGS) -c -o $@
+
+$(OBJDIR)/audio-file.cpp.o: audio-file.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling $<"
+	@$(CXX) $< $(BUILD_CXX_FLAGS) -c -o $@
+
+$(OBJDIR)/bigmeter.cpp.o: bigmeter.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling $<"
+	@$(CXX) $< $(BUILD_CXX_FLAGS) -c -o $@
+
+$(OBJDIR)/midi-file.cpp.o: midi-file.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling $<"
+	@$(CXX) $< $(BUILD_CXX_FLAGS) -c -o $@
+
+$(OBJDIR)/midi-pattern.cpp.o: midi-pattern.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling $<"
+	@$(CXX) $< $(BUILD_CXX_FLAGS) -c -o $@
+
+$(OBJDIR)/notes.cpp.o: notes.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling $<"
+	@$(CXX) $< $(BUILD_CXX_FLAGS) -c -o $@
 
 # ----------------------------------------------------------------------------------------------------------------------------
 
@@ -230,6 +302,18 @@ $(OBJDIR)/distrho-prom.cpp.o: distrho-prom.cpp
 
 # ----------------------------------------------------------------------------------------------------------------------------
 
+$(OBJDIR)/distrho-vectorjuice.cpp.o: distrho-vectorjuice.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling $<"
+	@$(CXX) $< $(BUILD_CXX_FLAGS) -DDISTRHO_NAMESPACE=DISTRHO_VectorJuice -Idistrho-vectorjuice -I$(CWD)/modules/dgl -Wno-effc++ -c -o $@
+
+$(OBJDIR)/distrho-wobblejuice.cpp.o: distrho-wobblejuice.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling $<"
+	@$(CXX) $< $(BUILD_CXX_FLAGS) -DDISTRHO_NAMESPACE=DISTRHO_WobbleJuice -Idistrho-wobblejuice -I$(CWD)/modules/dgl -Wno-effc++ -c -o $@
+
+# ----------------------------------------------------------------------------------------------------------------------------
+
 $(OBJDIR)/zynaddsubfx-fx.cpp.o: zynaddsubfx-fx.cpp $(ZYN_UI_FILES_H)
 	-@mkdir -p $(OBJDIR)
 	@echo "Compiling $<"
@@ -243,39 +327,31 @@ $(OBJDIR)/zynaddsubfx-synth.cpp.o: zynaddsubfx-synth.cpp $(ZYN_UI_FILES_H)
 $(OBJDIR)/zynaddsubfx-src.cpp.o: zynaddsubfx-src.cpp $(ZYN_UI_FILES_H)
 	-@mkdir -p $(OBJDIR)
 	@echo "Compiling $<"
-	@$(CXX) $< $(ZYN_CXX_FLAGS) -w -c -o $@
+	@$(CXX) $< $(ZYN_CXX_FLAGS) -Wno-unused-parameter -c -o $@
 
 $(OBJDIR)/zynaddsubfx-ui.cpp.o: zynaddsubfx-ui.cpp $(ZYN_UI_FILES_H) $(ZYN_UI_FILES_CPP)
 	-@mkdir -p $(OBJDIR)
 	@echo "Compiling $<"
-	@$(CXX) $< $(ZYN_CXX_FLAGS) -w -c -o $@
+	$(CXX) $< $(ZYN_CXX_FLAGS) -Wno-unused-parameter -Wno-unused-variable -c -o $@
 
 # ----------------------------------------------------------------------------------------------------------------------------
 
-$(OBJDIR)/zita-at1.cpp.o: zita-at1.cpp
+$(OBJDIR)/zita-%-ui.cpp.o: zita-%-ui.cpp
 	-@mkdir -p $(OBJDIR)
 	@echo "Compiling $<"
-	@$(CXX) $< $(BUILD_CXX_FLAGS) $(shell pkg-config --cflags fftw3f x11 xft) -Wno-unused-parameter -Wno-unused-result -c -o $@
+	@$(CXX) $< $(ZITA_UI_CXX_FLAGS) -c -o $@
 
-$(OBJDIR)/zita-bls1.cpp.o: zita-bls1.cpp
+$(OBJDIR)/zita-%.cpp.o: zita-%.cpp
 	-@mkdir -p $(OBJDIR)
 	@echo "Compiling $<"
-	@$(CXX) $< $(BUILD_CXX_FLAGS) $(shell pkg-config --cflags cairo fftw3f libpng12 x11 xft) -Wno-unused-parameter -Wno-unused-result -c -o $@
-
-$(OBJDIR)/zita-rev1.cpp.o: zita-rev1.cpp
-	-@mkdir -p $(OBJDIR)
-	@echo "Compiling $<"
-	@$(CXX) $< $(BUILD_CXX_FLAGS) $(shell pkg-config --cflags fftw3f x11 xft) -Wno-unused-parameter -Wno-unused-result -c -o $@
-
-# ----------------------------------------------------------------------------------------------------------------------------
-
-$(OBJDIR)/%.cpp.o: %.cpp
-	-@mkdir -p $(OBJDIR)
-	@echo "Compiling $<"
-	@$(CXX) $< $(BUILD_CXX_FLAGS) -c -o $@
+	@$(CXX) $< $(ZITA_DSP_CXX_FLAGS) -c -o $@
 
 # ----------------------------------------------------------------------------------------------------------------------------
 
 -include $(OBJS:%.o=%.d)
+-include $(OBJDIR)/zita-at1-ui.cpp.d
+-include $(OBJDIR)/zita-bls1-ui.cpp.d
+-include $(OBJDIR)/zita-rev1-ui.cpp.d
+-include $(OBJDIR)/zynaddsubfx-ui.cpp.d
 
 # ----------------------------------------------------------------------------------------------------------------------------

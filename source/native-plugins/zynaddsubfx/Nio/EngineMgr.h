@@ -9,11 +9,14 @@
 class MidiIn;
 class AudioOut;
 class OutMgr;
+struct SYNTH_T;
 /**Container/Owner of the long lived Engines*/
 class EngineMgr
 {
     public:
-        static EngineMgr &getInstance();
+        static EngineMgr &getInstance(
+            const SYNTH_T *synth = nullptr,
+            const class oss_devs_t* oss_devs = nullptr);
         ~EngineMgr();
 
         /**Gets requested engine
@@ -38,6 +41,6 @@ class EngineMgr
         AudioOut *defaultOut;
         MidiIn   *defaultIn;
     private:
-        EngineMgr();
+        EngineMgr(const SYNTH_T *synth, const oss_devs_t &oss_devs);
 };
 #endif

@@ -60,10 +60,10 @@ struct PatchbayGraph;
 class EngineInternalGraph
 {
 public:
-    EngineInternalGraph() noexcept;
+    EngineInternalGraph(CarlaEngine* const engine) noexcept;
     ~EngineInternalGraph() noexcept;
 
-    void create(const bool isRack, const double sampleRate, const uint32_t bufferSize, const uint32_t inputs, const uint32_t outputs);
+    void create(const uint32_t inputs, const uint32_t outputs);
     void destroy() noexcept;
 
     void setBufferSize(const uint32_t bufferSize);
@@ -84,9 +84,10 @@ public:
     void addPlugin(CarlaPlugin* const plugin);
     void replacePlugin(CarlaPlugin* const oldPlugin, CarlaPlugin* const newPlugin);
     void removePlugin(CarlaPlugin* const plugin);
-    void removeAllPlugins(CarlaEngine* const engine);
+    void removeAllPlugins();
 
-    void setIgnorePatchbay(const bool ignore) noexcept;
+    bool isUsingExternal() const noexcept;
+    void setUsingExternal(const bool usingExternal) noexcept;
 
 private:
     bool fIsRack;
@@ -96,6 +97,8 @@ private:
         RackGraph*     fRack;
         PatchbayGraph* fPatchbay;
     };
+
+    CarlaEngine* const kEngine;
 
     CARLA_PREVENT_HEAP_ALLOCATION
     CARLA_DECLARE_NON_COPY_STRUCT(EngineInternalGraph)
@@ -217,8 +220,6 @@ struct CarlaEngine::ProtectedData {
 
     // -------------------------------------------------------------------
 
-    //friend class ScopedActionLock;
-
 #ifdef CARLA_PROPER_CPP11_SUPPORT
     ProtectedData() = delete;
     CARLA_DECLARE_NON_COPY_STRUCT(ProtectedData)
@@ -230,16 +231,11 @@ struct CarlaEngine::ProtectedData {
 class PendingRtEventsRunner
 {
 public:
-    PendingRtEventsRunner(CarlaEngine* const engine) noexcept
-        : fEngine(engine) {}
-
-    ~PendingRtEventsRunner() noexcept
-    {
-        fEngine->runPendingRtEvents();
-    }
+    PendingRtEventsRunner(CarlaEngine* const engine) noexcept;
+    ~PendingRtEventsRunner() noexcept;
 
 private:
-    CarlaEngine* const fEngine;
+    CarlaEngine::ProtectedData* const pData;
 
     CARLA_PREVENT_HEAP_ALLOCATION
     CARLA_DECLARE_NON_COPY_CLASS(PendingRtEventsRunner)
@@ -250,14 +246,30 @@ private:
 class ScopedActionLock
 {
 public:
-    ScopedActionLock(CarlaEngine::ProtectedData* const data, const EnginePostAction action, const uint pluginId, const uint value, const bool lockWait) noexcept;
+    ScopedActionLock(CarlaEngine* const engine, const EnginePostAction action, const uint pluginId, const uint value, const bool lockWait) noexcept;
     ~ScopedActionLock() noexcept;
 
 private:
-    CarlaEngine::ProtectedData* const fData;
+    CarlaEngine::ProtectedData* const pData;
 
     CARLA_PREVENT_HEAP_ALLOCATION
     CARLA_DECLARE_NON_COPY_CLASS(ScopedActionLock)
+};
+
+// -----------------------------------------------------------------------
+
+class ScopedThreadStopper
+{
+public:
+    ScopedThreadStopper(CarlaEngine* const engine) noexcept;
+    ~ScopedThreadStopper() noexcept;
+
+private:
+    CarlaEngine* const engine;
+    CarlaEngine::ProtectedData* const pData;
+
+    CARLA_PREVENT_HEAP_ALLOCATION
+    CARLA_DECLARE_NON_COPY_CLASS(ScopedThreadStopper)
 };
 
 // -----------------------------------------------------------------------

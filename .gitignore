@@ -60,6 +60,7 @@ source/carla_config.py
 source/digitalpeakmeter.py
 source/ledbutton.py
 source/paramspinbox.py
+source/pianoroll.py
 source/pixmapbutton.py
 source/pixmapdial.py
 source/pixmapkeyboard.py
@@ -90,6 +91,12 @@ carla-discovery-posix64
 carla-frontend
 carla-lv2-export
 
+at1-ui
+bls1-ui
+rev1-ui
+zynaddsubfx-ui
+
+data/stoat-callgraph.png
 data/linux/unzipfx2cat32
 data/linux/unzipfx2cat64
 data/macos/*-svn/

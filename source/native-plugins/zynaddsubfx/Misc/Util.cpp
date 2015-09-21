@@ -20,12 +20,13 @@
 
 */
 
+#include "globals.h"
 #include "Util.h"
 #include <vector>
 #include <cassert>
-#include <math.h>
-#include <stdio.h>
-#include <err.h>
+#include <cmath>
+#include <cstdio>
+#include <fstream>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -37,12 +38,13 @@
 #include <sched.h>
 #endif
 
+#ifndef errx
+#include <err.h>
+#endif
+
+#include <rtosc/rtosc.h>
 
 prng_t prng_state = 0x1234;
-
-Config config;
-float *denormalkillbuf;
-
 
 /*
  * Transform the velocity according the scaling parameter (velocity sensing)
@@ -85,7 +87,7 @@ float getdetune(unsigned char type,
             findet = fabs(fdetune / 8192.0f) * 10.0f;
             break;
         case 3:
-            cdet   = fabs(cdetune * 100);
+            cdet   = fabs(cdetune * 100.0f);
             findet = powf(10, fabs(fdetune / 8192.0f) * 3.0f) / 10.0f - 0.1f;
             break;
         case 4:
@@ -136,6 +138,43 @@ void os_sleep(long length)
     usleep(length);
 }
 
+//!< maximum lenght a pid has on any POSIX system
+//!< this is an estimation, but more than 12 looks insane
+constexpr std::size_t max_pid_len = 12;
+
+//!< safe pid lenght guess, posix conform
+std::size_t os_guess_pid_length()
+{
+    const char* pid_max_file = "/proc/sys/kernel/pid_max";
+    if(-1 == access(pid_max_file, R_OK)) {
+        return max_pid_len;
+    }
+    else {
+        std::ifstream is(pid_max_file);
+        if(!is.good())
+            return max_pid_len;
+        else {
+            std::string s;
+            is >> s;
+            for(const auto& c : s)
+                if(c < '0' || c > '9')
+                    return max_pid_len;
+            return std::min(s.length(), max_pid_len);
+        }
+    }
+}
+
+//!< returns pid padded, posix conform
+std::string os_pid_as_padded_string()
+{
+    char result_str[max_pid_len << 1];
+    std::fill_n(result_str, max_pid_len, '0');
+    std::size_t written = snprintf(result_str + max_pid_len, max_pid_len,
+        "%d", (int)getpid());
+    // the below pointer should never cause segfaults:
+    return result_str + max_pid_len + written - os_guess_pid_length();
+}
+
 std::string legalizeFilename(std::string filename)
 {
     for(int i = 0; i < (int) filename.size(); ++i) {
@@ -172,4 +211,22 @@ float cinterpolate(const float *data, size_t len, float pos)
               r_pos      = (l_pos + 1) % len;
     const float leftness = pos - l_pos;
     return data[l_pos] * leftness + data[r_pos] * (1.0f - leftness);
+}
+
+char *rtosc_splat(const char *path, std::set<std::string> v)
+{
+    char argT[v.size()+1];
+    rtosc_arg_t arg[v.size()];
+    unsigned i=0;
+    for(auto vv : v) {
+        argT[i]  = 's';
+        arg[i].s = vv.c_str();
+        i++;
+    }
+    argT[v.size()] = 0;
+
+    size_t len = rtosc_amessage(0, 0, path, argT, arg);
+    char *buf = new char[len];
+    rtosc_amessage(buf, len, path, argT, arg);
+    return buf;
 }

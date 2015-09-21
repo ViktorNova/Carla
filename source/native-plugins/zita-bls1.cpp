@@ -15,22 +15,15 @@
  * For a full copy of the GNU General Public License see the doc/GPL.txt file.
  */
 
-#include "CarlaNative.hpp"
-#include "CarlaMathUtils.hpp"
+#include "CarlaNativeExtUI.hpp"
 #include "CarlaJuceUtils.hpp"
 
 #include "juce_audio_basics.h"
 
-#include "zita-common.hpp"
-#include "zita-bls1/guiclass.cc"
 #include "zita-bls1/hp3filt.cc"
 #include "zita-bls1/jclient.cc"
 #include "zita-bls1/lfshelf2.cc"
-#include "zita-bls1/mainwin.cc"
-#include "zita-bls1/png2img.cc"
-#include "zita-bls1/rotary.cc"
 #include "zita-bls1/shuffler.cc"
-#include "zita-bls1/styles.cc"
 
 using juce::FloatVectorOperations;
 using juce::ScopedPointer;
@@ -40,8 +33,7 @@ using namespace BLS1;
 // -----------------------------------------------------------------------
 // BLS1 Plugin
 
-class BLS1Plugin : public NativePluginClass,
-                   private Mainwin::ValueChangedCallback
+class BLS1Plugin : public NativePluginAndUiClass
 {
 public:
     static const uint32_t kNumInputs  = 2;
@@ -58,30 +50,16 @@ public:
     };
 
     BLS1Plugin(const NativeHostDescriptor* const host)
-        : NativePluginClass(host),
+        : NativePluginAndUiClass(host, "bls1-ui"),
           fJackClient(),
-          xresman(),
-          jclient(nullptr),
-          display(nullptr),
-          rootwin(nullptr),
-          mainwin(nullptr),
-          handler(nullptr),
-          handlerThread(),
-          leakDetector_BLS1Plugin()
+          jclient(nullptr)
     {
         CARLA_SAFE_ASSERT(host != nullptr);
 
         carla_zeroStruct(fJackClient);
 
-        fJackClient.clientName = "bls1";
         fJackClient.bufferSize = getBufferSize();
         fJackClient.sampleRate = getSampleRate();
-
-        int   argc   = 1;
-        char* argv[] = { (char*)"bls1" };
-        xresman.init(&argc, argv, (char*)"bls1", nullptr, 0);
-
-        jclient = new Jclient(xresman.rname(), &fJackClient);
 
         // set initial values
         fParameters[kParameterINPBAL] = 0.0f;
@@ -91,10 +69,7 @@ public:
         fParameters[kParameterLFFREQ] = 80.0f;
         fParameters[kParameterLFGAIN] = 0.0f;
 
-        jclient->set_inpbal(fParameters[kParameterINPBAL]);
-        jclient->set_hpfilt(fParameters[kParameterHPFILT]);
-        jclient->shuffler()->prepare(fParameters[kParameterSHGAIN], fParameters[kParameterSHFREQ]);
-        jclient->set_loshelf(fParameters[kParameterLFGAIN], fParameters[kParameterLFFREQ]);
+        _recreateZitaClient();
     }
 
     // -------------------------------------------------------------------
@@ -238,111 +213,18 @@ public:
     }
 
     // -------------------------------------------------------------------
-    // Plugin UI calls
-
-    void uiShow(const bool show) override
-    {
-        if (show)
-        {
-            if (display != nullptr)
-                return;
-
-            display = new X_display(nullptr);
-
-            if (display->dpy() == nullptr)
-                return hostUiUnavailable();
-
-            styles_init(display, &xresman, getResourceDir());
-
-            rootwin = new X_rootwin(display);
-            mainwin = new Mainwin(rootwin, &xresman, 0, 0, jclient, this);
-            rootwin->handle_event();
-            mainwin->x_set_title(getUiName());
-
-            handler = new X_handler(display, mainwin, EV_X11);
-
-            if (const uintptr_t winId = getUiParentId())
-                XSetTransientForHint(display->dpy(), mainwin->win(), static_cast<Window>(winId));
-
-            handler->next_event();
-            XFlush(display->dpy());
-
-            handlerThread.setupAndRun(handler, rootwin, mainwin);
-        }
-        else
-        {
-            if (handlerThread.isThreadRunning())
-                handlerThread.stopThread();
-
-            handler = nullptr;
-            mainwin = nullptr;
-            rootwin = nullptr;
-            display = nullptr;
-        }
-    }
-
-    void uiIdle() override
-    {
-        if (mainwin == nullptr)
-            return;
-
-        if (handlerThread.wasClosed())
-        {
-            {
-                const CarlaMutexLocker cml(handlerThread.getLock());
-                handler = nullptr;
-                mainwin = nullptr;
-                rootwin = nullptr;
-                display = nullptr;
-            }
-            uiClosed();
-        }
-    }
-
-    void uiSetParameterValue(const uint32_t index, const float value) override
-    {
-        CARLA_SAFE_ASSERT_RETURN(index < kParameterNROTARY,);
-
-        if (mainwin == nullptr)
-            return;
-
-        const CarlaMutexLocker cml(handlerThread.getLock());
-
-        mainwin->_rotary[index]->set_value(value);
-    }
-
-    // -------------------------------------------------------------------
     // Plugin dispatcher calls
 
     void bufferSizeChanged(const uint32_t bufferSize) override
     {
         fJackClient.bufferSize = bufferSize;
+        // _recreateZitaClient(); // FIXME
     }
 
     void sampleRateChanged(const double sampleRate) override
     {
         fJackClient.sampleRate = sampleRate;
-    }
-
-    void uiNameChanged(const char* const uiName) override
-    {
-        CARLA_SAFE_ASSERT_RETURN(uiName != nullptr && uiName[0] != '\0',);
-
-        if (mainwin == nullptr)
-            return;
-
-        const CarlaMutexLocker cml(handlerThread.getLock());
-
-        mainwin->x_set_title(uiName);
-    }
-
-    // -------------------------------------------------------------------
-    // Mainwin callbacks
-
-    void valueChangedCallback(uint index, double value) override
-    {
-        fParameters[index] = value;
-        uiParameterChanged(index, value);
+        // _recreateZitaClient(); // FIXME
     }
 
     // -------------------------------------------------------------------
@@ -352,15 +234,19 @@ private:
     jack_client_t fJackClient;
 
     // Zita stuff (core)
-    X_resman xresman;
-    ScopedPointer<Jclient>   jclient;
-    ScopedPointer<X_display> display;
-    ScopedPointer<X_rootwin> rootwin;
-    ScopedPointer<Mainwin>   mainwin;
-    ScopedPointer<X_handler> handler;
-    X_handler_thread<Mainwin> handlerThread;
+    ScopedPointer<Jclient> jclient;
 
+    // Parameters
     float fParameters[kParameterNROTARY];
+
+    void _recreateZitaClient()
+    {
+        jclient = new Jclient(&fJackClient);
+        jclient->set_inpbal(fParameters[kParameterINPBAL]);
+        jclient->set_hpfilt(fParameters[kParameterHPFILT]);
+        jclient->shuffler()->prepare(fParameters[kParameterSHGAIN], fParameters[kParameterSHFREQ]);
+        jclient->set_loshelf(fParameters[kParameterLFGAIN], fParameters[kParameterLFFREQ]);
+    }
 
     PluginClassEND(BLS1Plugin)
     CARLA_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BLS1Plugin)
@@ -372,10 +258,8 @@ static const NativePluginDescriptor bls1Desc = {
     /* category  */ NATIVE_PLUGIN_CATEGORY_FILTER,
     /* hints     */ static_cast<NativePluginHints>(NATIVE_PLUGIN_IS_RTSAFE
                                                   |NATIVE_PLUGIN_HAS_UI
-                                                  |NATIVE_PLUGIN_NEEDS_FIXED_BUFFERS
-                                                  |NATIVE_PLUGIN_NEEDS_UI_MAIN_THREAD
-                                                  |NATIVE_PLUGIN_USES_PARENT_ID),
-    /* supports  */ static_cast<NativePluginSupports>(0x0),
+                                                  |NATIVE_PLUGIN_NEEDS_FIXED_BUFFERS),
+    /* supports  */ NATIVE_PLUGIN_SUPPORTS_NOTHING,
     /* audioIns  */ BLS1Plugin::kNumInputs,
     /* audioOuts */ BLS1Plugin::kNumOutputs,
     /* midiIns   */ 0,

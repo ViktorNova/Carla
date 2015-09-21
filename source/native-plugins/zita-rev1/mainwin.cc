@@ -1,8 +1,8 @@
 // ----------------------------------------------------------------------
 //
 //  Copyright (C) 2010 Fons Adriaensen <fons@linuxaudio.org>
-//  Modified by falkTX on Jan 2015 for inclusion in Carla
-//
+//  Modified by falkTX on Jan-Apr 2015 for inclusion in Carla
+//    
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation; either version 2 of the License, or
@@ -30,24 +30,21 @@
 namespace REV1 {
 
 
-Mainwin::Mainwin (X_rootwin *parent, X_resman *xres, int xp, int yp, Jclient *jclient, ValueChangedCallback* valuecb) :
+Mainwin::Mainwin (X_rootwin *parent, X_resman *xres, int xp, int yp, bool ambisonic, ValueChangedCallback* valuecb) :
     A_thread ("Main"),
     X_window (parent, xp, yp, XSIZE, YSIZE, XftColors [C_MAIN_BG]->pixel),
     _stop (false),
+    _ambis (ambisonic),
     _xres (xres),
-    _jclient (jclient),
     _valuecb (valuecb)
 {
     X_hints     H;
-    char        s [256];
     int         i, x;
 
     _atom = XInternAtom (dpy (), "WM_DELETE_WINDOW", True);
     XSetWMProtocols (dpy (), win (), &_atom, 1);
     _atom = XInternAtom (dpy (), "WM_PROTOCOLS", True);
 
-    sprintf (s, "%s", jclient->jname ());
-    x_set_title (s);
     H.position (xp, yp);
     H.minsize (XSIZE, YSIZE);
     H.maxsize (XSIZE, YSIZE);
@@ -55,7 +52,6 @@ Mainwin::Mainwin (X_rootwin *parent, X_resman *xres, int xp, int yp, Jclient *jc
     H.rclas (xres->rclas ());
     x_apply (&H); 
 
-    _ambis = xres->getb (".ambisonic", false);
     RotaryCtl::init (disp ());
     x = 0;
     _rotary [R_DELAY] = new Rlinctl (this, this, &r_delay_img, x, 0, 160, 5,  0.02,  0.100,  0.04, R_DELAY);
@@ -76,10 +72,9 @@ Mainwin::Mainwin (X_rootwin *parent, X_resman *xres, int xp, int yp, Jclient *jc
     if (_ambis) _rotary [R_RGXYZ]->x_map ();
     else        _rotary [R_OPMIX]->x_map ();
 
-    x_add_events (ExposureMask); 
-    x_map (); 
+    x_add_events (ExposureMask);
     set_time (0);
-    inc_time (500000);
+    inc_time (50000);
 }
 
  
@@ -136,8 +131,8 @@ void Mainwin::clmesg (XClientMessageEvent *E)
 
 void Mainwin::handle_time (void)
 {
-    inc_time (500000);
-//    XFlush (dpy ());
+    inc_time (5000);
+   XFlush (dpy ());
 }
 
 
@@ -172,50 +167,41 @@ void Mainwin::handle_callb (int type, X_window *W, XEvent *E)
 	{
         case R_DELAY:
             v = _rotary [R_DELAY]->value ();
-            _jclient->reverb ()->set_delay (v);
             _valuecb->valueChangedCallback (R_DELAY, v);
 	    break;
 	case R_XOVER:   
             v = _rotary [R_XOVER]->value ();
-            _jclient->reverb ()->set_xover (v);
             _valuecb->valueChangedCallback (R_XOVER, v);
 	    break;
 	case R_RTLOW:   
             v = _rotary [R_RTLOW]->value ();
-            _jclient->reverb ()->set_rtlow (v);
             _valuecb->valueChangedCallback (R_RTLOW, v);
 	    break;
 	case R_RTMID:
             v = _rotary [R_RTMID]->value ();
-            _jclient->reverb ()->set_rtmid (v);
             _valuecb->valueChangedCallback (R_RTMID, v);
             break;
 	case R_FDAMP:     
             v = _rotary [R_FDAMP]->value ();
-            _jclient->reverb ()->set_fdamp (v);
             _valuecb->valueChangedCallback (R_FDAMP, v);
 	    break;
 	case R_OPMIX:     
             v = _rotary [R_OPMIX]->value ();
-            _jclient->reverb ()->set_opmix (v);
             _valuecb->valueChangedCallback (R_OPMIX, v);
 	    break;
 	case R_RGXYZ:     
             v = _rotary [R_RGXYZ]->value ();
-            _jclient->reverb ()->set_rgxyz (v);
             _valuecb->valueChangedCallback (R_RGXYZ, v);
 	    break;
 	case R_EQ1FR:     
 	case R_EQ1GN:     
             v = _rotary [R_EQ1FR]->value (), v2 = _rotary [R_EQ1GN]->value ();
-            _jclient->reverb ()->set_eq1 (v, v2);
             _valuecb->valueChangedCallback (R_EQ1FR, v);
             _valuecb->valueChangedCallback (R_EQ1GN, v2);
 	    break;
 	case R_EQ2FR:     
 	case R_EQ2GN:     
             v = _rotary [R_EQ2FR]->value (), v2 = _rotary [R_EQ2GN]->value ();
-            _jclient->reverb ()->set_eq2 (v, v2);
             _valuecb->valueChangedCallback (R_EQ2FR, v);
             _valuecb->valueChangedCallback (R_EQ2GN, v2);
 	    break;

@@ -91,7 +91,7 @@ static const NativePluginDescriptor midisplitDesc = {
     .audioIns  = 0,
     .audioOuts = 0,
     .midiIns   = 1,
-    .midiOuts  = 16,
+    .midiOuts  = MAX_MIDI_CHANNELS,
     .paramIns  = 0,
     .paramOuts = 0,
     .name      = "MIDI Split",
@@ -105,7 +105,6 @@ static const NativePluginDescriptor midisplitDesc = {
     .get_parameter_count = NULL,
     .get_parameter_info  = NULL,
     .get_parameter_value = NULL,
-    .get_parameter_text  = NULL,
 
     .get_midi_program_count = NULL,
     .get_midi_program_info  = NULL,

@@ -1,6 +1,6 @@
 /*
  * Carla common utils
- * Copyright (C) 2011-2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2011-2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -39,7 +39,7 @@
 # include <unistd.h>
 #endif
 
-// -----------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // misc functions
 
 /*
@@ -66,7 +66,7 @@ void nullStrBuf(char* const strBuf) noexcept
 static inline
 void pass() noexcept {}
 
-// -----------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // string print functions
 
 /*
@@ -148,7 +148,7 @@ void carla_stderr2(const char* const fmt, ...) noexcept
     } catch (...) {}
 }
 
-// -----------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // carla_safe_assert*
 
 /*
@@ -164,12 +164,14 @@ void carla_safe_assert(const char* const assertion, const char* const file, cons
  * Print a safe assertion error message, with 1 extra integer value.
  */
 static inline
-void carla_safe_assert_int(const char* const assertion, const char* const file, const int line, const int value) noexcept
+void carla_safe_assert_int(const char* const assertion, const char* const file, const int line,
+                                                                                const int value) noexcept
 {
     carla_stderr2("Carla assertion failure: \"%s\" in file %s, line %i, value %i", assertion, file, line, value);
 }
 static inline
-void carla_safe_assert_uint(const char* const assertion, const char* const file, const int line, const uint value) noexcept
+void carla_safe_assert_uint(const char* const assertion, const char* const file, const int line,
+                                                                                 const uint value) noexcept
 {
     carla_stderr2("Carla assertion failure: \"%s\" in file %s, line %i, value %u", assertion, file, line, value);
 }
@@ -178,17 +180,19 @@ void carla_safe_assert_uint(const char* const assertion, const char* const file,
  * Print a safe assertion error message, with 2 extra integer values.
  */
 static inline
-void carla_safe_assert_int2(const char* const assertion, const char* const file, const int line, const int v1, const int v2) noexcept
+void carla_safe_assert_int2(const char* const assertion, const char* const file, const int line,
+                                                                                 const int v1, const int v2) noexcept
 {
     carla_stderr2("Carla assertion failure: \"%s\" in file %s, line %i, v1 %i, v2 %i", assertion, file, line, v1, v2);
 }
 static inline
-void carla_safe_assert_uint2(const char* const assertion, const char* const file, const int line, const uint v1, const uint v2) noexcept
+void carla_safe_assert_uint2(const char* const assertion, const char* const file, const int line,
+                                                                                  const uint v1, const uint v2) noexcept
 {
     carla_stderr2("Carla assertion failure: \"%s\" in file %s, line %i, v1 %u, v2 %u", assertion, file, line, v1, v2);
 }
 
-// -----------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // carla_safe_exception*
 
 /*
@@ -200,7 +204,7 @@ void carla_safe_exception(const char* const exception, const char* const file, c
     carla_stderr2("Carla exception caught: \"%s\" in file %s, line %i", exception, file, line);
 }
 
-// -----------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // carla_*sleep
 
 /*
@@ -237,7 +241,7 @@ void carla_msleep(const uint msecs) noexcept
     } CARLA_SAFE_EXCEPTION("carla_msleep");
 }
 
-// -----------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // carla_setenv
 
 /*
@@ -275,7 +279,7 @@ void carla_unsetenv(const char* const key) noexcept
 #endif
 }
 
-// -----------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // carla_strdup
 
 /*
@@ -292,7 +296,7 @@ const char* carla_strdup(const char* const strBuf)
     char* const       buffer    = new char[bufferLen+1];
 
     if (strBuf != nullptr && bufferLen > 0)
-        std::strncpy(buffer, strBuf, bufferLen);
+        std::memcpy(buffer, strBuf, bufferLen);
 
     buffer[bufferLen] = '\0';
 
@@ -330,14 +334,14 @@ const char* carla_strdup_safe(const char* const strBuf) noexcept
     } CARLA_SAFE_EXCEPTION_RETURN("carla_strdup_safe", nullptr);
 
     if (strBuf != nullptr && bufferLen > 0)
-        std::strncpy(buffer, strBuf, bufferLen);
+        std::memcpy(buffer, strBuf, bufferLen);
 
     buffer[bufferLen] = '\0';
 
     return buffer;
 }
 
-// -----------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // memory functions
 
 /*
@@ -345,14 +349,14 @@ const char* carla_strdup_safe(const char* const strBuf) noexcept
  */
 template<typename T>
 static inline
-void carla_add(T* dataDst, const T* dataSrc, const std::size_t size) noexcept
+void carla_add(T dest[], const T src[], const std::size_t count) noexcept
 {
-    CARLA_SAFE_ASSERT_RETURN(dataDst != nullptr,);
-    CARLA_SAFE_ASSERT_RETURN(dataSrc != nullptr,);
-    CARLA_SAFE_ASSERT_RETURN(size > 0,);
+    CARLA_SAFE_ASSERT_RETURN(dest != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(src != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(count > 0,);
 
-    for (std::size_t i=0; i < size; ++i)
-        *dataDst++ += *dataSrc++;
+    for (std::size_t i=0; i<count; ++i)
+        *dest++ += *src++;
 }
 
 /*
@@ -360,13 +364,13 @@ void carla_add(T* dataDst, const T* dataSrc, const std::size_t size) noexcept
  */
 template<typename T>
 static inline
-void carla_copy(T* const dataDst, const T* const dataSrc, const std::size_t size) noexcept
+void carla_copy(T dest[], const T src[], const std::size_t count) noexcept
 {
-    CARLA_SAFE_ASSERT_RETURN(dataDst != nullptr,);
-    CARLA_SAFE_ASSERT_RETURN(dataSrc != nullptr,);
-    CARLA_SAFE_ASSERT_RETURN(size > 0,);
+    CARLA_SAFE_ASSERT_RETURN(dest != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(src != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(count > 0,);
 
-    std::memcpy(dataDst, dataSrc, size*sizeof(T));
+    std::memcpy(dest, src, count*sizeof(T));
 }
 
 /*
@@ -374,19 +378,19 @@ void carla_copy(T* const dataDst, const T* const dataSrc, const std::size_t size
  */
 template<typename T>
 static inline
-void carla_fill(T* data, const T v, const std::size_t size) noexcept
+void carla_fill(T data[], const T& value, const std::size_t count) noexcept
 {
     CARLA_SAFE_ASSERT_RETURN(data != nullptr,);
-    CARLA_SAFE_ASSERT_RETURN(size > 0,);
+    CARLA_SAFE_ASSERT_RETURN(count > 0,);
 
-    if (v == 0)
+    if (value == 0)
     {
-        std::memset(data, 0, size*sizeof(T));
+        std::memset(data, 0, count*sizeof(T));
     }
     else
     {
-        for (std::size_t i=0; i < size; ++i)
-            *data++ = v;
+        for (std::size_t i=0; i<count; ++i)
+            *data++ = value;
     }
 }
 
@@ -394,24 +398,24 @@ void carla_fill(T* data, const T v, const std::size_t size) noexcept
  * Clear a byte array.
  */
 static inline
-void carla_zeroBytes(void* const memory, const std::size_t numBytes) noexcept
+void carla_zeroBytes(uint8_t bytes[], const std::size_t count) noexcept
 {
-    CARLA_SAFE_ASSERT_RETURN(memory != nullptr,);
-    CARLA_SAFE_ASSERT_RETURN(numBytes > 0,);
+    CARLA_SAFE_ASSERT_RETURN(bytes != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(count > 0,);
 
-    std::memset(memory, 0, numBytes);
+    std::memset(bytes, 0, count*sizeof(uint8_t));
 }
 
 /*
  * Clear a char array.
  */
 static inline
-void carla_zeroChar(char* const data, const std::size_t numChars) noexcept
+void carla_zeroChars(char chars[], const std::size_t count) noexcept
 {
-    CARLA_SAFE_ASSERT_RETURN(data != nullptr,);
-    CARLA_SAFE_ASSERT_RETURN(numChars > 0,);
+    CARLA_SAFE_ASSERT_RETURN(chars != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(count > 0,);
 
-    std::memset(data, 0, numChars*sizeof(char));
+    std::memset(chars, 0, count*sizeof(char));
 }
 
 /*
@@ -419,61 +423,61 @@ void carla_zeroChar(char* const data, const std::size_t numChars) noexcept
  */
 template<typename T>
 static inline
-void carla_zeroPointers(T* pointers[], const std::size_t numPointers) noexcept
+void carla_zeroPointers(T* ptrs[], const std::size_t count) noexcept
 {
-    CARLA_SAFE_ASSERT_RETURN(pointers != nullptr,);
-    CARLA_SAFE_ASSERT_RETURN(numPointers > 0,);
-
-    std::memset(pointers, 0, numPointers*sizeof(T*));
-}
-
-/*
- * Clear a single struct/class.
- */
-template <typename T>
-static inline
-void carla_zeroStruct(T& structure) noexcept
-{
-    std::memset(&structure, 0, sizeof(T));
-}
-
-/*
- * Clear an array of struct/classes.
- */
-template <typename T>
-static inline
-void carla_zeroStruct(T* const structure, const std::size_t count) noexcept
-{
-    CARLA_SAFE_ASSERT_RETURN(structure != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(ptrs != nullptr,);
     CARLA_SAFE_ASSERT_RETURN(count > 0,);
 
-    std::memset(structure, 0, count*sizeof(T));
+    std::memset(ptrs, 0, count*sizeof(T*));
 }
 
 /*
- * Copy a single struct/class.
+ * Clear a single struct.
  */
 template <typename T>
 static inline
-void carla_copyStruct(T& struct1, const T& struct2) noexcept
+void carla_zeroStruct(T& s) noexcept
 {
-    std::memcpy(&struct1, &struct2, sizeof(T));
+    std::memset(&s, 0, sizeof(T));
 }
 
 /*
- * Copy an array of struct/classes.
+ * Clear a struct array.
  */
 template <typename T>
 static inline
-void carla_copyStruct(T* const struct1, const T* const struct2, const std::size_t count) noexcept
+void carla_zeroStructs(T structs[], const std::size_t count) noexcept
 {
-    CARLA_SAFE_ASSERT_RETURN(struct1 != nullptr,);
-    CARLA_SAFE_ASSERT_RETURN(struct2 != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(structs != nullptr,);
     CARLA_SAFE_ASSERT_RETURN(count > 0,);
 
-    std::memcpy(struct1, struct2, count*sizeof(T));
+    std::memset(structs, 0, count*sizeof(T));
 }
 
-// -----------------------------------------------------------------------
+/*
+ * Copy a single struct.
+ */
+template <typename T>
+static inline
+void carla_copyStruct(T& dest, const T& src) noexcept
+{
+    std::memcpy(&dest, &src, sizeof(T));
+}
+
+/*
+ * Copy a struct array.
+ */
+template <typename T>
+static inline
+void carla_copyStructs(T dest[], const T src[], const std::size_t count) noexcept
+{
+    CARLA_SAFE_ASSERT_RETURN(dest != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(src != nullptr,);
+    CARLA_SAFE_ASSERT_RETURN(count > 0,);
+
+    std::memcpy(dest, src, count*sizeof(T));
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 #endif // CARLA_UTILS_HPP_INCLUDED

@@ -24,8 +24,52 @@
 
 #ifndef GLOBALS_H
 #define GLOBALS_H
-#include <stdint.h>
 
+#if defined(__clang__)
+#define REALTIME __attribute__((annotate("realtime")))
+#define NONREALTIME __attribute__((annotate("nonrealtime")))
+#else
+#define REALTIME
+#define NONREALTIME
+#endif
+
+//Forward Declarations
+namespace rtosc{struct Ports; class ThreadLink;};
+class  EffectMgr;
+class  ADnoteParameters;
+struct ADnoteGlobalParam;
+class  SUBnoteParameters;
+class  PADnoteParameters;
+class  SynthNote;
+
+class  Allocator;
+
+class  Microtonal;
+class  XMLwrapper;
+class  Resonance;
+class  FFTwrapper;
+class  EnvelopeParams;
+class  LFOParams;
+class  FilterParams;
+
+class  LFO;
+class  Envelope;
+class  OscilGen;
+
+class  Controller;
+class  Master;
+class  Part;
+
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include <complex>
+#else
+namespace std {
+    template<class T> struct complex;
+};
+#endif
+
+typedef double fftw_real;
+typedef std::complex<fftw_real> fft_t;
 
 /**
  * The number of harmonics of additive synth
@@ -62,9 +106,9 @@
 #define NUM_VOICES 8
 
 /*
- * The poliphony (notes)
+ * The polyphony (notes)
  */
-#define POLIPHONY 60
+#define POLYPHONY 60
 
 /*
  * Number of system effects
@@ -119,9 +163,17 @@
 #define FF_MAX_FORMANTS 12
 #define FF_MAX_SEQUENCE 8
 
+#define MAX_PRESETTYPE_SIZE 30
+
 #define LOG_2 0.693147181f
 #define PI 3.1415926536f
 #define LOG_10 2.302585093f
+
+/*
+ * Envelope Limits
+ */
+#define MAX_ENVELOPE_POINTS 40
+#define MIN_ENVELOPE_DB -400
 
 /*
  * The threshold for the amplitude interpolation used if the amplitude
@@ -200,22 +252,51 @@ enum LegatoMsg {
 #define O_BINARY 0
 #endif
 
+template<class T>
+class m_unique_ptr
+{
+    T* ptr = nullptr;
+public:
+    m_unique_ptr() = default;
+    m_unique_ptr(m_unique_ptr&& other) {
+        ptr = other.ptr;
+        other.ptr = nullptr;
+    }
+    m_unique_ptr(const m_unique_ptr& other) = delete;
+    ~m_unique_ptr() { ptr = nullptr; }
+    void resize(unsigned sz) {
+        delete[] ptr;
+        ptr = new T[sz]; }
+
+    operator T*() { return ptr; }
+    operator const T*() const { return ptr; }
+    T& operator[](unsigned idx) { return ptr[idx]; }
+    const T& operator[](unsigned idx) const { return ptr[idx]; }
+};
+
 //temporary include for synth->{samplerate/buffersize} members
 struct SYNTH_T {
+
     SYNTH_T(void)
         :samplerate(44100), buffersize(256), oscilsize(1024)
     {
         alias();
     }
 
+    SYNTH_T(const SYNTH_T& ) = delete;
+    SYNTH_T(SYNTH_T&& ) = default;
+
+    /** the buffer to add noise in order to avoid denormalisation */
+    m_unique_ptr<float> denormalkillbuf;
+
     /**Sampling rate*/
     unsigned int samplerate;
 
     /**
      * The size of a sound buffer (or the granularity)
-     * All internal transfer of sound data use buffer of this size
-     * All parameters are constant during this period of time, exception
-     * some parameters(like amplitudes) which are linear interpolated.
+     * All internal transfer of sound data use buffer of this size.
+     * All parameters are constant during this period of time, except
+     * some parameters(like amplitudes) which are linearly interpolated.
      * If you increase this you'll ecounter big latencies, but if you
      * decrease this the CPU requirements gets high.
      */
@@ -235,15 +316,11 @@ struct SYNTH_T {
     int   bufferbytes;
     float oscilsize_f;
 
-    inline void alias(void)
+    float dt(void) const
     {
-        halfsamplerate_f = (samplerate_f = samplerate) / 2.0f;
-        buffersize_f     = buffersize;
-        bufferbytes      = buffersize * sizeof(float);
-        oscilsize_f      = oscilsize;
+        return buffersize_f / samplerate_f;
     }
+    void alias(void);
     static float numRandom(void); //defined in Util.cpp for now
 };
-
-extern SYNTH_T *synth;
 #endif

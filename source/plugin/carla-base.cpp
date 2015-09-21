@@ -36,10 +36,10 @@ using CarlaBackend::CarlaPlugin;
 // -----------------------------------------------------------------------
 
 CARLA_EXTERN_C
-std::size_t carla_getNativePluginCount();
+std::size_t carla_getNativePluginCount() noexcept;
 
 CARLA_EXTERN_C
-const NativePluginDescriptor* carla_getNativePluginDescriptor(const std::size_t index);
+const NativePluginDescriptor* carla_getNativePluginDescriptor(const std::size_t index) noexcept;
 
 // -----------------------------------------------------------------------
 // Plugin List
@@ -66,20 +66,18 @@ struct PluginListManager {
                 continue;
 
             // skip some plugins
-            if (std::strcmp(desc->label, "3bandeq"      ) == 0 ||
+            if (std::strcmp(desc->label, "bypass"       ) == 0 ||
+                std::strcmp(desc->label, "3bandeq"      ) == 0 ||
                 std::strcmp(desc->label, "3bandsplitter") == 0 ||
                 std::strcmp(desc->label, "mverb"        ) == 0 ||
                 std::strcmp(desc->label, "nekobi"       ) == 0 ||
                 std::strcmp(desc->label, "pingpongpan"  ) == 0 ||
                 std::strcmp(desc->label, "prom"         ) == 0 ||
-                std::strcmp(desc->label, "vexsynth"     ) == 0)
+                std::strstr(desc->label, "juice"        ) != nullptr ||
+                std::strstr(desc->label, "Zam"          ) != nullptr)
             {
                 continue;
             }
-
-            // skip midi plugins, not implemented yet
-            if (desc->audioIns == 0 && desc->audioOuts == 0 && desc->midiIns >= 1 && desc->midiOuts >= 1)
-                continue;
 
             descs.append(desc);
         }
@@ -88,7 +86,7 @@ struct PluginListManager {
     ~PluginListManager()
     {
 #ifdef CARLA_NATIVE_PLUGIN_DSSI
-        for (LinkedList<const DSSI_Descriptor*>::Itenerator it = dssiDescs.begin(); it.valid(); it.next())
+        for (LinkedList<const DSSI_Descriptor*>::Itenerator it = dssiDescs.begin2(); it.valid(); it.next())
         {
             const DSSI_Descriptor* const dssiDesc(it.getValue());
             //delete[] lv2Desc->URI;
@@ -98,7 +96,7 @@ struct PluginListManager {
 #endif
 
 #ifdef CARLA_NATIVE_PLUGIN_LV2
-        for (LinkedList<const LV2_Descriptor*>::Itenerator it = lv2Descs.begin(); it.valid(); it.next())
+        for (LinkedList<const LV2_Descriptor*>::Itenerator it = lv2Descs.begin2(); it.valid(); it.next())
         {
             const LV2_Descriptor* const lv2Desc(it.getValue());
             delete[] lv2Desc->URI;

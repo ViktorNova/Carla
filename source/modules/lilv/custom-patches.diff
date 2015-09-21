@@ -1,7 +1,7 @@
-diff --git a/source/modules/lilv/lilv-0.20.0/lilv/lilv.h b/source/modules/lilv/lilv-0.20.0/lilv/lilv.h
-index 5c26681..ca673e4 100644
---- a/source/modules/lilv/lilv-0.20.0/lilv/lilv.h
-+++ b/source/modules/lilv/lilv-0.20.0/lilv/lilv.h
+diff --git a/source/modules/lilv/lilv-0.21.3/lilv/lilv.h b/source/modules/lilv/lilv-0.21.3/lilv/lilv.h
+index e907789..84223c5 100644
+--- a/source/modules/lilv/lilv-0.21.3/lilv/lilv.h
++++ b/source/modules/lilv/lilv-0.21.3/lilv/lilv.h
 @@ -26,8 +26,9 @@
  #include <stdint.h>
  #include <stdio.h>
@@ -14,7 +14,16 @@ index 5c26681..ca673e4 100644
  
  #ifdef LILV_SHARED
  #    ifdef _WIN32
-@@ -1152,9 +1153,9 @@ lilv_port_get_scale_points(const LilvPlugin* plugin,
+@@ -552,7 +553,7 @@ lilv_world_free(LilvWorld* world);
+    with special plugin bundles which are installed to a known location).
+ */
+ LILV_API void
+-lilv_world_load_all(LilvWorld* world);
++lilv_world_load_all(LilvWorld* world, const char* lv2_path);
+ 
+ /**
+    Load a specific bundle.
+@@ -1199,9 +1200,9 @@ lilv_port_get_scale_points(const LilvPlugin* plugin,
     @return A new LilvState which must be freed with lilv_state_free(), or NULL.
  */
  LILV_API LilvState*
@@ -27,7 +36,7 @@ index 5c26681..ca673e4 100644
  
  /**
     Load a state snapshot from a file.
-@@ -1172,18 +1173,18 @@ lilv_state_new_from_world(LilvWorld*      world,
+@@ -1219,18 +1220,18 @@ lilv_state_new_from_world(LilvWorld*      world,
     new memory consumed once this function returns.
  */
  LILV_API LilvState*
@@ -53,7 +62,7 @@ index 5c26681..ca673e4 100644
  
  /**
     Function to get a port value.
-@@ -1352,7 +1353,8 @@ typedef void (*LilvSetPortValueFunc)(const char* port_symbol,
+@@ -1425,7 +1426,8 @@ lilv_state_emit_port_values(const LilvState*     state,
  */
  LILV_API void
  lilv_state_restore(const LilvState*           state,
@@ -63,12 +72,33 @@ index 5c26681..ca673e4 100644
                     LilvSetPortValueFunc       set_value,
                     void*                      user_data,
                     uint32_t                   flags,
-@@ -1695,6 +1697,21 @@ LILV_API const LilvNode*
+@@ -1786,6 +1788,42 @@ LILV_API const LilvNode*
  lilv_ui_get_binary_uri(const LilvUI* ui);
  
  /**
 +  Custom calls
 +*/
++LILV_API LilvNode*
++lilv_plugin_get_modgui_resources_directory(const LilvPlugin* plugin);
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_stylesheet(const LilvPlugin* plugin);
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_icon_template(const LilvPlugin* plugin);
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_settings_template(const LilvPlugin* plugin);
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_template_data(const LilvPlugin* plugin);
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_screenshot(const LilvPlugin* plugin);
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_thumbnail(const LilvPlugin* plugin);
++
 +LILV_API const LilvNodes*
 +lilv_ui_get_supported_features(const LilvUI* ui);
 +
@@ -85,10 +115,10 @@ index 5c26681..ca673e4 100644
     @}
     @}
  */
-diff --git a/source/modules/lilv/lilv-0.20.0/lilv/lilvmm.hpp b/source/modules/lilv/lilv-0.20.0/lilv/lilvmm.hpp
-index b9b3a69..0d82f3f 100644
---- a/source/modules/lilv/lilv-0.20.0/lilv/lilvmm.hpp
-+++ b/source/modules/lilv/lilv-0.20.0/lilv/lilvmm.hpp
+diff --git a/source/modules/lilv/lilv-0.21.3/lilv/lilvmm.hpp b/source/modules/lilv/lilv-0.21.3/lilv/lilvmm.hpp
+index b9b3a69..367b8d8 100644
+--- a/source/modules/lilv/lilv-0.21.3/lilv/lilvmm.hpp
++++ b/source/modules/lilv/lilv-0.21.3/lilv/lilvmm.hpp
 @@ -17,6 +17,8 @@
  #ifndef LILV_LILVMM_HPP
  #define LILV_LILVMM_HPP
@@ -103,7 +133,7 @@ index b9b3a69..0d82f3f 100644
  	inline RT name() { return lilv_ ## prefix ## _ ## name (me); }
  
 +#define LILV_WRAP0_CONST(RT, prefix, name) \
-+        inline RT name() const { return lilv_ ## prefix ## _ ## name (me); }
++	inline RT name() const { return lilv_ ## prefix ## _ ## name (me); }
 +
  #define LILV_WRAP0_VOID(prefix, name) \
  	inline void name() { lilv_ ## prefix ## _ ## name(me); }
@@ -112,7 +142,7 @@ index b9b3a69..0d82f3f 100644
  #endif
  
  struct Node {
-+        inline Node(LilvNode* node)       : me(node) {}
++	inline Node(LilvNode* node)       : me(node) {}
  	inline Node(const LilvNode* node) : me(lilv_node_duplicate(node)) {}
  	inline Node(const Node& copy)     : me(lilv_node_duplicate(copy.me)) {}
  
@@ -149,11 +179,11 @@ index b9b3a69..0d82f3f 100644
 +	LILV_WRAP0_CONST(bool,        node, is_bool);
 +	LILV_WRAP0_CONST(bool,        node, as_bool);
 +
-+        Node& operator=(const Node& copy) {
-+                lilv_node_free(me);
-+                me = lilv_node_duplicate(copy.me);
-+                return *this;
-+        }
++	Node& operator=(const Node& copy) {
++		lilv_node_free(me);
++		me = lilv_node_duplicate(copy.me);
++		return *this;
++	}
  
  	LilvNode* me;
  };
@@ -172,9 +202,9 @@ index b9b3a69..0d82f3f 100644
  	LILV_WRAP1(bool, nodes, contains, const Node, node);
 -	LILV_WRAP0(Node, nodes, get_first);
 +
-+        inline Node get_first() const {
-+              return Node((const LilvNode*)lilv_nodes_get_first(me));
-+        }
++	inline Node get_first() const {
++		return Node((const LilvNode*)lilv_nodes_get_first(me));
++	}
  };
  
  struct UI {
@@ -190,18 +220,32 @@ index b9b3a69..0d82f3f 100644
 -	           const LilvNode*,     container_type,
 -	           const LilvNode**,    ui_type);*/
 -	LILV_WRAP1(bool, ui, is_a, const LilvNode*, class_uri);
-+        LILV_WRAP0(Node,  ui, get_uri);
-+        LILV_WRAP1(bool,  ui, is_a, LilvNode*, ui_class);
-+        LILV_WRAP0(Node,  ui, get_bundle_uri);
-+        LILV_WRAP0(Node,  ui, get_binary_uri);
-+        LILV_WRAP0(Nodes, ui, get_supported_features);
-+        LILV_WRAP0(Nodes, ui, get_required_features);
-+        LILV_WRAP0(Nodes, ui, get_optional_features);
-+        LILV_WRAP0(Nodes, ui, get_extension_data);
++	LILV_WRAP0(Node,  ui, get_uri);
++	LILV_WRAP1(bool,  ui, is_a, LilvNode*, ui_class);
++	LILV_WRAP0(Node,  ui, get_bundle_uri);
++	LILV_WRAP0(Node,  ui, get_binary_uri);
++	LILV_WRAP0(Nodes, ui, get_supported_features);
++	LILV_WRAP0(Nodes, ui, get_required_features);
++	LILV_WRAP0(Nodes, ui, get_optional_features);
++	LILV_WRAP0(Nodes, ui, get_extension_data);
  
  	const LilvUI* me;
  };
-@@ -258,16 +272,14 @@ struct Plugins {
+@@ -220,6 +234,13 @@ struct Plugin {
+ 	LILV_WRAP0(Nodes,       plugin, get_extension_data);
+ 	LILV_WRAP0(UIs,         plugin, get_uis);
+ 	LILV_WRAP1(Nodes,       plugin, get_related, Node, type);
++	LILV_WRAP0(Node,        plugin, get_modgui_resources_directory);
++	LILV_WRAP0(Node,        plugin, get_modgui_stylesheet);
++	LILV_WRAP0(Node,        plugin, get_modgui_icon_template);
++	LILV_WRAP0(Node,        plugin, get_modgui_settings_template);
++	LILV_WRAP0(Node,        plugin, get_modgui_template_data);
++	LILV_WRAP0(Node,        plugin, get_modgui_screenshot);
++	LILV_WRAP0(Node,        plugin, get_modgui_thumbnail);
+ 
+ 	inline Port get_port_by_index(unsigned index) {
+ 		return Port(me, lilv_plugin_get_port_by_index(me, index));
+@@ -258,16 +279,14 @@ struct Plugins {
  struct Instance {
  	inline Instance(LilvInstance* instance) : me(instance) {}
  
@@ -209,23 +253,23 @@ index b9b3a69..0d82f3f 100644
 -	inline Instance(Plugin plugin, double sample_rate) {
 -		me = lilv_plugin_instantiate(plugin, sample_rate, NULL);
 -	}
-+        LILV_DEPRECATED
-+        inline Instance(Plugin plugin, double sample_rate)
-+                : me(lilv_plugin_instantiate(plugin, sample_rate, NULL)) {}
++	LILV_DEPRECATED
++	inline Instance(Plugin plugin, double sample_rate)
++		: me(lilv_plugin_instantiate(plugin, sample_rate, NULL)) {}
  
 -	LILV_DEPRECATED inline Instance(Plugin              plugin,
 -	                                double              sample_rate,
 -	                                LV2_Feature* const* features) {
 -		me = lilv_plugin_instantiate(plugin, sample_rate, features);
 -	}
-+        LILV_DEPRECATED inline Instance(Plugin              plugin,
-+                                        double              sample_rate,
-+                                        LV2_Feature* const* features)
-+                : me(lilv_plugin_instantiate(plugin, sample_rate, features)) {}
++	LILV_DEPRECATED inline Instance(Plugin              plugin,
++	                                double              sample_rate,
++	                                LV2_Feature* const* features)
++		: me(lilv_plugin_instantiate(plugin, sample_rate, features)) {}
  
  	static inline Instance* create(Plugin              plugin,
  	                               double              sample_rate,
-@@ -304,22 +316,22 @@ struct Instance {
+@@ -304,22 +323,22 @@ struct Instance {
  };
  
  struct World {
@@ -255,20 +299,29 @@ index b9b3a69..0d82f3f 100644
  		return lilv_new_bool(me, val);
  	}
  	inline Nodes find_nodes(const LilvNode* subject,
-@@ -337,6 +349,8 @@ struct World {
+@@ -329,7 +348,7 @@ struct World {
+ 	}
+ 
+ 	LILV_WRAP2_VOID(world, set_option, const char*, uri, LilvNode*, value);
+-	LILV_WRAP0_VOID(world, load_all);
++	LILV_WRAP1_VOID(world, load_all, const char*, lv2_path);
+ 	LILV_WRAP1_VOID(world, load_bundle, LilvNode*, bundle_uri);
+ 	LILV_WRAP0(const LilvPluginClass*, world, get_plugin_class);
+ 	LILV_WRAP0(const LilvPluginClasses*, world, get_plugin_classes);
+@@ -337,6 +356,8 @@ struct World {
  	LILV_WRAP1(int, world, load_resource, const LilvNode*, resource);
  
  	LilvWorld* me;
 +
-+        CARLA_DECLARE_NON_COPY_STRUCT(World)
++	CARLA_DECLARE_NON_COPY_STRUCT(World)
  };
  
  } /* namespace Lilv */
-diff --git a/source/modules/lilv/lilv-0.20.0/src/lilv_internal.h b/source/modules/lilv/lilv-0.20.0/src/lilv_internal.h
-index ed2c13a..8d30b39 100644
---- a/source/modules/lilv/lilv-0.20.0/src/lilv_internal.h
-+++ b/source/modules/lilv/lilv-0.20.0/src/lilv_internal.h
-@@ -50,7 +50,7 @@ static inline char* dlerror(void) { return "Unknown error"; }
+diff --git a/source/modules/lilv/lilv-0.21.3/src/lilv_internal.h b/source/modules/lilv/lilv-0.21.3/src/lilv_internal.h
+index e2444d3..4d0a8e5 100644
+--- a/source/modules/lilv/lilv-0.21.3/src/lilv_internal.h
++++ b/source/modules/lilv/lilv-0.21.3/src/lilv_internal.h
+@@ -53,7 +53,7 @@ static inline char* dlerror(void) { return "Unknown error"; }
  #include "lilv/lilv.h"
  
  #ifdef LILV_DYN_MANIFEST
@@ -277,11 +330,11 @@ index ed2c13a..8d30b39 100644
  #endif
  
  /*
-diff --git a/source/modules/lilv/lilv-0.20.0/src/plugin.c b/source/modules/lilv/lilv-0.20.0/src/plugin.c
-index 9c966b6..7bd6e60 100644
---- a/source/modules/lilv/lilv-0.20.0/src/plugin.c
-+++ b/source/modules/lilv/lilv-0.20.0/src/plugin.c
-@@ -27,7 +27,7 @@
+diff --git a/source/modules/lilv/lilv-0.21.3/src/plugin.c b/source/modules/lilv/lilv-0.21.3/src/plugin.c
+index bf0843b..c711990 100644
+--- a/source/modules/lilv/lilv-0.21.3/src/plugin.c
++++ b/source/modules/lilv/lilv-0.21.3/src/plugin.c
+@@ -27,10 +27,11 @@
  #include "lilv_config.h"
  #include "lilv_internal.h"
  
@@ -290,10 +343,146 @@ index 9c966b6..7bd6e60 100644
  
  #define NS_DOAP (const uint8_t*)"http://usefulinc.com/ns/doap#"
  #define NS_FOAF (const uint8_t*)"http://xmlns.com/foaf/0.1/"
-diff --git a/source/modules/lilv/lilv-0.20.0/src/port.c b/source/modules/lilv/lilv-0.20.0/src/port.c
++#define NS_MOD  (const uint8_t*)"http://moddevices.com/ns/modgui#"
+ 
+ /** Ownership of `uri` is taken */
+ LilvPlugin*
+@@ -908,6 +909,131 @@ lilv_plugin_get_author_homepage(const LilvPlugin* plugin)
+ 	return NULL;
+ }
+ 
++static const SordNode*
++lilv_plugin_get_modgui(const LilvPlugin* p)
++{
++        lilv_plugin_load_if_necessary(p);
++
++        SordNode* mod_gui = sord_new_uri(
++                p->world->world, NS_MOD "gui");
++
++        SordIter* gui = lilv_world_query_internal(
++                p->world,
++                p->plugin_uri->node,
++                mod_gui,
++                NULL);
++
++        sord_node_free(p->world->world, mod_gui);
++
++        if (sord_iter_end(gui)) {
++                sord_iter_free(gui);
++                return NULL;
++        }
++
++        const SordNode* Gui = sord_iter_get_node(gui, SORD_OBJECT);
++
++        sord_iter_free(gui);
++        return Gui;
++}
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_resources_directory(const LilvPlugin* plugin)
++{
++        const SordNode* modgui = lilv_plugin_get_modgui(plugin);
++        if (modgui) {
++                SordWorld* sworld     = plugin->world->world;
++                SordNode*  modgui_res = sord_new_uri(sworld, NS_MOD "resourcesDirectory");
++                LilvNode*  ret        = lilv_plugin_get_one(plugin, modgui, modgui_res);
++                sord_node_free(sworld, modgui_res);
++                return ret;
++        }
++        return NULL;
++}
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_stylesheet(const LilvPlugin* plugin)
++{
++        const SordNode* modgui = lilv_plugin_get_modgui(plugin);
++        if (modgui) {
++                SordWorld* sworld       = plugin->world->world;
++                SordNode*  modgui_style = sord_new_uri(sworld, NS_MOD "stylesheet");
++                LilvNode*  ret          = lilv_plugin_get_one(plugin, modgui, modgui_style);
++                sord_node_free(sworld, modgui_style);
++                return ret;
++        }
++        return NULL;
++}
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_icon_template(const LilvPlugin* plugin)
++{
++        const SordNode* modgui = lilv_plugin_get_modgui(plugin);
++        if (modgui) {
++                SordWorld* sworld      = plugin->world->world;
++                SordNode*  modgui_tmpl = sord_new_uri(sworld, NS_MOD "iconTemplate");
++                LilvNode*  ret         = lilv_plugin_get_one(plugin, modgui, modgui_tmpl);
++                sord_node_free(sworld, modgui_tmpl);
++                return ret;
++        }
++        return NULL;
++}
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_settings_template(const LilvPlugin* plugin)
++{
++        const SordNode* modgui = lilv_plugin_get_modgui(plugin);
++        if (modgui) {
++                SordWorld* sworld      = plugin->world->world;
++                SordNode*  modgui_tmpl = sord_new_uri(sworld, NS_MOD "settingsTemplate");
++                LilvNode*  ret         = lilv_plugin_get_one(plugin, modgui, modgui_tmpl);
++                sord_node_free(sworld, modgui_tmpl);
++                return ret;
++        }
++        return NULL;
++}
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_template_data(const LilvPlugin* plugin)
++{
++        const SordNode* modgui = lilv_plugin_get_modgui(plugin);
++        if (modgui) {
++                SordWorld* sworld      = plugin->world->world;
++                SordNode*  modgui_tmpl = sord_new_uri(sworld, NS_MOD "templateData");
++                LilvNode*  ret         = lilv_plugin_get_one(plugin, modgui, modgui_tmpl);
++                sord_node_free(sworld, modgui_tmpl);
++                return ret;
++        }
++        return NULL;
++}
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_screenshot(const LilvPlugin* plugin)
++{
++        const SordNode* modgui = lilv_plugin_get_modgui(plugin);
++        if (modgui) {
++                SordWorld* sworld     = plugin->world->world;
++                SordNode*  modgui_scr = sord_new_uri(sworld, NS_MOD "screenshot");
++                LilvNode*  ret        = lilv_plugin_get_one(plugin, modgui, modgui_scr);
++                sord_node_free(sworld, modgui_scr);
++                return ret;
++        }
++        return NULL;
++}
++
++LILV_API LilvNode*
++lilv_plugin_get_modgui_thumbnail(const LilvPlugin* plugin)
++{
++        const SordNode* modgui = lilv_plugin_get_modgui(plugin);
++        if (modgui) {
++                SordWorld* sworld       = plugin->world->world;
++                SordNode*  modgui_thumb = sord_new_uri(sworld, NS_MOD "thumbnail");
++                LilvNode*  ret          = lilv_plugin_get_one(plugin, modgui, modgui_thumb);
++                sord_node_free(sworld, modgui_thumb);
++                return ret;
++        }
++        return NULL;
++}
++
+ LILV_API bool
+ lilv_plugin_is_replaced(const LilvPlugin* plugin)
+ {
+diff --git a/source/modules/lilv/lilv-0.21.3/src/port.c b/source/modules/lilv/lilv-0.21.3/src/port.c
 index 6bf8fc7..0a50891 100644
---- a/source/modules/lilv/lilv-0.20.0/src/port.c
-+++ b/source/modules/lilv/lilv-0.20.0/src/port.c
+--- a/source/modules/lilv/lilv-0.21.3/src/port.c
++++ b/source/modules/lilv/lilv-0.21.3/src/port.c
 @@ -20,8 +20,8 @@
  #include <stdlib.h>
  #include <string.h>
@@ -305,10 +494,10 @@ index 6bf8fc7..0a50891 100644
  
  #include "lilv_internal.h"
  
-diff --git a/source/modules/lilv/lilv-0.20.0/src/state.c b/source/modules/lilv/lilv-0.20.0/src/state.c
-index 68d48f1..fa54484 100644
---- a/source/modules/lilv/lilv-0.20.0/src/state.c
-+++ b/source/modules/lilv/lilv-0.20.0/src/state.c
+diff --git a/source/modules/lilv/lilv-0.21.3/src/state.c b/source/modules/lilv/lilv-0.21.3/src/state.c
+index 79199e4..119dcee 100644
+--- a/source/modules/lilv/lilv-0.21.3/src/state.c
++++ b/source/modules/lilv/lilv-0.21.3/src/state.c
 @@ -18,10 +18,10 @@
  #include <stdio.h>
  #include <string.h>
@@ -324,7 +513,7 @@ index 68d48f1..fa54484 100644
  
  #include "lilv_config.h"
  #include "lilv_internal.h"
-@@ -397,30 +397,18 @@ lilv_state_new_from_instance(const LilvPlugin*          plugin,
+@@ -411,35 +411,18 @@ lilv_state_emit_port_values(const LilvState*     state,
  
  LILV_API void
  lilv_state_restore(const LilvState*           state,
@@ -336,6 +525,11 @@ index 68d48f1..fa54484 100644
                     uint32_t                   flags,
                     const LV2_Feature *const * features)
  {
+-	if (!state) {
+-		LILV_ERROR("lilv_state_restore() called on NULL state\n");
+-		return;
+-	}
+-
 -	LV2_State_Map_Path map_path = {
 -		(LilvState*)state, abstract_path, absolute_path };
 -	LV2_Feature map_feature = { LV2_STATE__mapPath, &map_path };
@@ -357,9 +551,9 @@ index 68d48f1..fa54484 100644
 -	free(sfeatures);
 -
  	if (set_value) {
- 		for (uint32_t i = 0; i < state->num_values; ++i) {
- 			const PortValue* val = &state->values[i];
-@@ -571,9 +559,9 @@ new_state_from_model(LilvWorld*       world,
+ 		lilv_state_emit_port_values(state, set_value, user_data);
+ 	}
+@@ -586,9 +569,9 @@ new_state_from_model(LilvWorld*       world,
  }
  
  LILV_API LilvState*
@@ -372,7 +566,7 @@ index 68d48f1..fa54484 100644
  {
  	if (!lilv_node_is_uri(node) && !lilv_node_is_blank(node)) {
  		LILV_ERRORF("Subject `%s' is not a URI or blank node.\n",
-@@ -588,10 +576,10 @@ lilv_state_new_from_world(LilvWorld*      world,
+@@ -600,10 +583,10 @@ lilv_state_new_from_world(LilvWorld*      world,
  }
  
  LILV_API LilvState*
@@ -387,7 +581,7 @@ index 68d48f1..fa54484 100644
  {
  	if (subject && !lilv_node_is_uri(subject)
  	    && !lilv_node_is_blank(subject)) {
-@@ -641,9 +629,9 @@ set_prefixes(SerdEnv* env)
+@@ -653,9 +636,9 @@ set_prefixes(SerdEnv* env)
  }
  
  LILV_API LilvState*
@@ -400,10 +594,10 @@ index 68d48f1..fa54484 100644
  {
  	if (!str) {
  		return NULL;
-diff --git a/source/modules/lilv/lilv-0.20.0/src/ui.c b/source/modules/lilv/lilv-0.20.0/src/ui.c
-index 0f4f2f6..a3e17da 100644
---- a/source/modules/lilv/lilv-0.20.0/src/ui.c
-+++ b/source/modules/lilv/lilv-0.20.0/src/ui.c
+diff --git a/source/modules/lilv/lilv-0.21.3/src/ui.c b/source/modules/lilv/lilv-0.21.3/src/ui.c
+index 0f4f2f6..a0dd567 100644
+--- a/source/modules/lilv/lilv-0.21.3/src/ui.c
++++ b/source/modules/lilv/lilv-0.21.3/src/ui.c
 @@ -109,3 +109,54 @@ lilv_ui_get_binary_uri(const LilvUI* ui)
  {
  	return ui->binary_uri;
@@ -459,11 +653,11 @@ index 0f4f2f6..a3e17da 100644
 +       assert(ui->world);
 +       return lilv_ui_get_value_internal(ui, ui->world->uris.lv2_extensionData);
 +}
-diff --git a/source/modules/lilv/lilv-0.20.0/src/util.c b/source/modules/lilv/lilv-0.20.0/src/util.c
-index f1c9c1c..7ca7ca0 100644
---- a/source/modules/lilv/lilv-0.20.0/src/util.c
-+++ b/source/modules/lilv/lilv-0.20.0/src/util.c
-@@ -29,7 +29,6 @@
+diff --git a/source/modules/lilv/lilv-0.21.3/src/util.c b/source/modules/lilv/lilv-0.21.3/src/util.c
+index 31c9238..5bcdb7e 100644
+--- a/source/modules/lilv/lilv-0.21.3/src/util.c
++++ b/source/modules/lilv/lilv-0.21.3/src/util.c
+@@ -30,7 +30,6 @@
  #include <string.h>
  
  #ifdef _WIN32
@@ -471,19 +665,22 @@ index f1c9c1c..7ca7ca0 100644
  #    include <windows.h>
  #    include <direct.h>
  #    include <io.h>
-@@ -426,7 +425,7 @@ lilv_symlink(const char* oldpath, const char* newpath)
+@@ -446,10 +445,7 @@ lilv_symlink(const char* oldpath, const char* newpath)
  	int ret = 0;
  	if (strcmp(oldpath, newpath)) {
  #ifdef _WIN32
 -		ret = !CreateSymbolicLink(newpath, oldpath, 0);
-+		ret = 0;
+-		if (ret) {
+-			ret = !CreateHardLink(newpath, oldpath, 0);
+-		}
++		ret = 1;
  #else
  		ret = symlink(oldpath, newpath);
  #endif
-diff --git a/source/modules/lilv/lilv-0.20.0/src/world.c b/source/modules/lilv/lilv-0.20.0/src/world.c
-index 41fe16f..76db7fc 100644
---- a/source/modules/lilv/lilv-0.20.0/src/world.c
-+++ b/source/modules/lilv/lilv-0.20.0/src/world.c
+diff --git a/source/modules/lilv/lilv-0.21.3/src/world.c b/source/modules/lilv/lilv-0.21.3/src/world.c
+index 02dbeec..8b2db95 100644
+--- a/source/modules/lilv/lilv-0.21.3/src/world.c
++++ b/source/modules/lilv/lilv-0.21.3/src/world.c
 @@ -19,7 +19,7 @@
  #include <stdlib.h>
  #include <string.h>
@@ -493,10 +690,24 @@ index 41fe16f..76db7fc 100644
  
  #include "lilv_internal.h"
  
-diff --git a/source/modules/lilv/sratom-0.4.6/sratom/sratom.h b/source/modules/lilv/sratom-0.4.6/sratom/sratom.h
-index bb1af95..67855d5 100644
---- a/source/modules/lilv/sratom-0.4.6/sratom/sratom.h
-+++ b/source/modules/lilv/sratom-0.4.6/sratom/sratom.h
+@@ -797,12 +797,8 @@ lilv_world_load_plugin_classes(LilvWorld* world)
+ }
+ 
+ LILV_API void
+-lilv_world_load_all(LilvWorld* world)
++lilv_world_load_all(LilvWorld* world, const char* lv2_path)
+ {
+-	const char* lv2_path = getenv("LV2_PATH");
+-	if (!lv2_path)
+-		lv2_path = LILV_DEFAULT_LV2_PATH;
+-
+ 	// Discover bundles and read all manifest files into model
+ 	lilv_world_load_path(world, lv2_path);
+ 
+diff --git a/source/modules/lilv/sratom-0.4.7/sratom/sratom.h b/source/modules/lilv/sratom-0.4.7/sratom/sratom.h
+index a86f67e..f0c12b9 100644
+--- a/source/modules/lilv/sratom-0.4.7/sratom/sratom.h
++++ b/source/modules/lilv/sratom-0.4.7/sratom/sratom.h
 @@ -23,9 +23,9 @@
  
  #include <stdint.h>
@@ -510,11 +721,11 @@ index bb1af95..67855d5 100644
  #include "serd/serd.h"
  #include "sord/sord.h"
  
-diff --git a/source/modules/lilv/sratom-0.4.6/src/sratom.c b/source/modules/lilv/sratom-0.4.6/src/sratom.c
-index 4d8add7..555bbda 100644
---- a/source/modules/lilv/sratom-0.4.6/src/sratom.c
-+++ b/source/modules/lilv/sratom-0.4.6/src/sratom.c
-@@ -22,9 +22,9 @@
+diff --git a/source/modules/lilv/sratom-0.4.7/src/sratom.c b/source/modules/lilv/sratom-0.4.7/src/sratom.c
+index 272e6e3..4f9d136 100644
+--- a/source/modules/lilv/sratom-0.4.7/src/sratom.c
++++ b/source/modules/lilv/sratom-0.4.7/src/sratom.c
+@@ -20,9 +20,9 @@
  #include <stdlib.h>
  #include <string.h>
  

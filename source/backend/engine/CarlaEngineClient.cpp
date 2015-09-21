@@ -105,7 +105,7 @@ void CarlaEngineClient::setLatency(const uint32_t samples) noexcept
     pData->latency = samples;
 }
 
-CarlaEnginePort* CarlaEngineClient::addPort(const EnginePortType portType, const char* const name, const bool isInput)
+CarlaEnginePort* CarlaEngineClient::addPort(const EnginePortType portType, const char* const name, const bool isInput, const uint32_t indexOffset)
 {
     CARLA_SAFE_ASSERT_RETURN(name != nullptr && name[0] != '\0', nullptr);
     carla_debug("CarlaEngineClient::addPort(%i:%s, \"%s\", %s)", portType, EnginePortType2Str(portType), name, bool2str(isInput));
@@ -116,13 +116,13 @@ CarlaEnginePort* CarlaEngineClient::addPort(const EnginePortType portType, const
         break;
     case kEnginePortTypeAudio:
         _addAudioPortName(isInput, name);
-        return new CarlaEngineAudioPort(*this, isInput);
+        return new CarlaEngineAudioPort(*this, isInput, indexOffset);
     case kEnginePortTypeCV:
         _addCVPortName(isInput, name);
-        return new CarlaEngineCVPort(*this, isInput);
+        return new CarlaEngineCVPort(*this, isInput, indexOffset);
     case kEnginePortTypeEvent:
         _addEventPortName(isInput, name);
-        return new CarlaEngineEventPort(*this, isInput);
+        return new CarlaEngineEventPort(*this, isInput, indexOffset);
     }
 
     carla_stderr("CarlaEngineClient::addPort(%i, \"%s\", %s) - invalid type", portType, name, bool2str(isInput));
@@ -189,7 +189,7 @@ void CarlaEngineClient::_addEventPortName(const bool isInput, const char* const 
 
 static void getUniquePortName(CarlaString& sname, const CarlaStringList& list)
 {
-    for (CarlaStringList::Itenerator it = list.begin(); it.valid(); it.next())
+    for (CarlaStringList::Itenerator it = list.begin2(); it.valid(); it.next())
     {
         const char* const portName(it.getValue(nullptr));
         CARLA_SAFE_ASSERT_CONTINUE(portName != nullptr && portName[0] != '\0');
@@ -261,6 +261,16 @@ const char* CarlaEngineClient::_getUniquePortName(const char* const name)
     getUniquePortName(sname, pData->eventOutList);
 
     return sname.dup();
+}
+
+void CarlaEngineClient::_clearPorts()
+{
+    pData->audioInList.clear();
+    pData->audioOutList.clear();
+    pData->cvInList.clear();
+    pData->cvOutList.clear();
+    pData->eventInList.clear();
+    pData->eventOutList.clear();
 }
 
 // -----------------------------------------------------------------------

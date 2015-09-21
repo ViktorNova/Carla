@@ -39,7 +39,11 @@
     Enables a memory-leak check for certain objects when the app terminates. See the LeakedObjectDetector
     class and the JUCE_LEAK_DETECTOR macro for more details about enabling leak checking for specific classes.
 */
-#define JUCE_CHECK_MEMORY_LEAKS 1
+#ifdef DEBUG
+ #define JUCE_CHECK_MEMORY_LEAKS 1
+#else
+ #define JUCE_CHECK_MEMORY_LEAKS 0
+#endif
 
 //=============================================================================
 /** Config: JUCE_DONT_AUTOLINK_TO_WIN32_LIBRARIES
@@ -59,15 +63,29 @@
 */
 #define JUCE_INCLUDE_ZLIB_CODE 1
 
+/** Config: JUCE_USE_CURL
+    Enables http/https support via libcurl (Linux only). Enabling this will add an additional
+    run-time dynmic dependency to libcurl.
+
+    If you disable this then https/ssl support will not be available on linux.
+*/
+#define JUCE_USE_CURL 0
+
 /*  Config: JUCE_CATCH_UNHANDLED_EXCEPTIONS
     If enabled, this will add some exception-catching code to forward unhandled exceptions
     to your JUCEApplicationBase::unhandledException() callback.
 */
 #define JUCE_CATCH_UNHANDLED_EXCEPTIONS 0
 
+// misc
 #define JUCE_DISABLE_JUCE_VERSION_PRINTING 1
-
+#define JUCE_STANDALONE_APPLICATION 0
+#define JUCE_STRING_UTF_TYPE 8
 #define JUCE_USE_VFORK 1
+
+// not used/wanted
+#define JUCE_USE_XRANDR 0
+#define JUCE_USE_XINERAMA 0
 
 #if ! (JUCE_MAC || JUCE_WINDOWS)
 # define JUCE_MODAL_LOOPS_PERMITTED  0
@@ -80,6 +98,7 @@
 #define JUCE_MODULE_AVAILABLE_juce_core                  1
 
 // always disabled
+#define JUCE_MODULE_AVAILABLE_juce_audio_plugin_client   0
 #define JUCE_MODULE_AVAILABLE_juce_audio_utils           0
 #define JUCE_MODULE_AVAILABLE_juce_cryptography          0
 #define JUCE_MODULE_AVAILABLE_juce_opengl                0

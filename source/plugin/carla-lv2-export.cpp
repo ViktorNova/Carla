@@ -1,6 +1,6 @@
 /*
  * Carla Native Plugins
- * Copyright (C) 2013-2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2013-2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -66,11 +66,8 @@ static const String nameToSymbol(const String& name, const uint32_t portIndex)
     {
         for (int i=0; i < trimmedName.length(); ++i)
         {
-#ifdef CARLA_OS_WIN
-            const int32_t c = static_cast<int32_t>(trimmedName[i]);
-#else
             const juce_wchar c = trimmedName[i];
-#endif
+
             if (i == 0 && std::isdigit(c))
                 symbol += "_";
             else if (std::isalpha(c) || std::isdigit(c))
@@ -118,7 +115,7 @@ static void writeManifestFile(PluginListManager& plm)
     // -------------------------------------------------------------------
     // Plugins
 
-    for (LinkedList<const NativePluginDescriptor*>::Itenerator it = plm.descs.begin(); it.valid(); it.next())
+    for (LinkedList<const NativePluginDescriptor*>::Itenerator it = plm.descs.begin2(); it.valid(); it.next())
     {
         const NativePluginDescriptor* const& pluginDesc(it.getValue());
         const String label(pluginDesc->label);
@@ -133,11 +130,23 @@ static void writeManifestFile(PluginListManager& plm)
     // -------------------------------------------------------------------
     // UI
 
-    text += "<http://kxstudio.sf.net/carla/ui>\n";
+#ifdef CARLA_OS_LINUX
+    text += "<http://kxstudio.sf.net/carla/ui-embed>\n";
+    text += "    a <" LV2_UI__X11UI "> ;\n";
+    text += "    ui:binary <carla" PLUGIN_EXT "> ;\n";
+    text += "    lv2:extensionData <" LV2_PROGRAMS__UIInterface "> ;\n";
+    text += "    lv2:optionalFeature <" LV2_UI__fixedSize "> ,\n";
+    text += "                        <" LV2_UI__noUserResize "> ;\n";
+    text += "    lv2:requiredFeature <" LV2_INSTANCE_ACCESS_URI "> ,\n";
+    text += "                        <" LV2_UI__resize "> .\n";
+    text += "\n";
+#endif
+
+    text += "<http://kxstudio.sf.net/carla/ui-ext>\n";
     text += "    a <" LV2_EXTERNAL_UI__Widget "> ;\n";
     text += "    ui:binary <carla" PLUGIN_EXT "> ;\n";
-    text += "    lv2:extensionData ui:idleInterface ,\n";
-    text += "                      ui:showInterface ,\n";
+    text += "    lv2:extensionData <" LV2_UI__idleInterface "> ,\n";
+    text += "                      <" LV2_UI__showInterface "> ,\n";
     text += "                      <" LV2_PROGRAMS__UIInterface "> ;\n";
     text += "    lv2:requiredFeature <" LV2_INSTANCE_ACCESS_URI "> .\n";
 
@@ -267,10 +276,10 @@ static void writePluginFile(const NativePluginDescriptor* const pluginDesc)
     // -------------------------------------------------------------------
     // Extensions
 
-    text += "    lv2:extensionData <" LV2_OPTIONS__interface "> ;";
+    text += "    lv2:extensionData <" LV2_OPTIONS__interface "> ;\n";
 
     if (pluginDesc->hints & NATIVE_PLUGIN_USES_STATE)
-        text += "    lv2:extensionData <" LV2_STATE__interface "> ;";
+        text += "    lv2:extensionData <" LV2_STATE__interface "> ;\n";
 
     if (pluginDesc->category != NATIVE_PLUGIN_CATEGORY_SYNTH)
         text += "    lv2:extensionData <" LV2_PROGRAMS__Interface "> ;\n";
@@ -282,7 +291,18 @@ static void writePluginFile(const NativePluginDescriptor* const pluginDesc)
 
     if (pluginDesc->hints & NATIVE_PLUGIN_HAS_UI)
     {
-        text += "    ui:ui <http://kxstudio.sf.net/carla/ui> ;\n";
+#ifdef CARLA_OS_LINUX
+        if (std::strncmp(pluginDesc->label, "carla", 5) == 0)
+        {
+            text += "    ui:ui <http://kxstudio.sf.net/carla/ui-embed> ,\n";
+            text += "          <http://kxstudio.sf.net/carla/ui-ext> ;\n";
+        }
+        else
+#endif
+        {
+            text += "    ui:ui <http://kxstudio.sf.net/carla/ui-ext> ;\n";
+        }
+
         text += "\n";
     }
 
@@ -308,15 +328,31 @@ static void writePluginFile(const NativePluginDescriptor* const pluginDesc)
         text += "        lv2:designation lv2:control ;\n";
         text += "        lv2:index " + String(portIndex++) + " ;\n";
 
-        if (pluginDesc->midiIns > 1)
+        if (pluginDesc->hints & NATIVE_PLUGIN_USES_TIME)
         {
-            text += "        lv2:symbol \"lv2_events_in_1\" ;\n";
-            text += "        lv2:name \"Events Input #1\" ;\n";
+            if (pluginDesc->midiIns > 1)
+            {
+                text += "        lv2:symbol \"lv2_events_in_1\" ;\n";
+                text += "        lv2:name \"Events Input #1\" ;\n";
+            }
+            else
+            {
+                text += "        lv2:symbol \"lv2_events_in\" ;\n";
+                text += "        lv2:name \"Events Input\" ;\n";
+            }
         }
         else
         {
-            text += "        lv2:symbol \"lv2_events_in\" ;\n";
-            text += "        lv2:name \"Events Input\" ;\n";
+            if (pluginDesc->midiIns > 1)
+            {
+                text += "        lv2:symbol \"lv2_midi_in_1\" ;\n";
+                text += "        lv2:name \"MIDI Input #1\" ;\n";
+            }
+            else
+            {
+                text += "        lv2:symbol \"lv2_midi_in\" ;\n";
+                text += "        lv2:name \"MIDI Input\" ;\n";
+            }
         }
 
         text += "    ] ;\n\n";
@@ -334,17 +370,8 @@ static void writePluginFile(const NativePluginDescriptor* const pluginDesc)
         text += "        atom:bufferType atom:Sequence ;\n";
         text += "        atom:supports <" LV2_MIDI__MidiEvent "> ;\n";
         text += "        lv2:index " + String(portIndex++) + " ;\n";
-
-        if (pluginDesc->midiIns > 1)
-        {
-            text += "        lv2:symbol \"lv2_events_in_" + String(i+1) + "\" ;\n";
-            text += "        lv2:name \"Events Input #" + String(i+1) + "\" ;\n";
-        }
-        else
-        {
-            text += "        lv2:symbol \"lv2_events_in\" ;\n";
-            text += "        lv2:name \"Events Input\" ;\n";
-        }
+        text += "        lv2:symbol \"lv2_midi_in_" + String(i+1) + "\" ;\n";
+        text += "        lv2:name \"MIDI Input #" + String(i+1) + "\" ;\n";
 
         if (i+1 == pluginDesc->midiIns)
             text += "    ] ;\n\n";
@@ -394,7 +421,7 @@ static void writePluginFile(const NativePluginDescriptor* const pluginDesc)
     text += "        lv2:minimum 0.0 ;\n";
     text += "        lv2:maximum 1.0 ;\n";
     text += "        lv2:designation <" LV2_CORE__freeWheeling "> ;\n";
-    text += "        lv2:portProperty lv2:toggled ;\n";
+    text += "        lv2:portProperty lv2:toggled, <" LV2_PORT_PROPS__notOnGUI "> ;\n";
     text += "    ] ;\n";
     text += "\n";
 
@@ -475,27 +502,20 @@ static void writePluginFile(const NativePluginDescriptor* const pluginDesc)
         text += "        lv2:minimum " + String::formatted("%f", paramInfo->ranges.min) + " ;\n";
         text += "        lv2:maximum " + String::formatted("%f", paramInfo->ranges.max) + " ;\n";
 
-        if (paramInfo->hints & NATIVE_PARAMETER_IS_ENABLED)
-        {
-            if ((paramInfo->hints & NATIVE_PARAMETER_IS_AUTOMABLE) == 0)
-                text += "        lv2:portProperty <" LV2_PORT_PROPS__expensive "> ;\n";
-            if (paramInfo->hints & NATIVE_PARAMETER_IS_BOOLEAN)
-                text += "        lv2:portProperty lv2:toggled ;\n";
-            if (paramInfo->hints & NATIVE_PARAMETER_IS_INTEGER)
-                text += "        lv2:portProperty lv2:integer ;\n";
-            if (paramInfo->hints & NATIVE_PARAMETER_IS_LOGARITHMIC)
-                text += "        lv2:portProperty <" LV2_PORT_PROPS__logarithmic "> ;\n";
-            if (paramInfo->hints & NATIVE_PARAMETER_USES_SAMPLE_RATE)
-                text += "        lv2:portProperty lv2:toggled ;\n";
-            if (paramInfo->hints & NATIVE_PARAMETER_USES_SCALEPOINTS)
-                text += "        lv2:portProperty lv2:enumeration ;\n";
-            if (paramInfo->hints & NATIVE_PARAMETER_USES_CUSTOM_TEXT)
-                pass(); // TODO: custom lv2 extension for this
-        }
-        else
-        {
+        if ((paramInfo->hints & NATIVE_PARAMETER_IS_AUTOMABLE) == 0)
+            text += "        lv2:portProperty <" LV2_PORT_PROPS__expensive "> ;\n";
+        if (paramInfo->hints & NATIVE_PARAMETER_IS_BOOLEAN)
+            text += "        lv2:portProperty lv2:toggled ;\n";
+        if (paramInfo->hints & NATIVE_PARAMETER_IS_INTEGER)
+            text += "        lv2:portProperty lv2:integer ;\n";
+        if (paramInfo->hints & NATIVE_PARAMETER_IS_LOGARITHMIC)
+            text += "        lv2:portProperty <" LV2_PORT_PROPS__logarithmic "> ;\n";
+        if (paramInfo->hints & NATIVE_PARAMETER_USES_SAMPLE_RATE)
+            text += "        lv2:portProperty lv2:toggled ;\n";
+        if (paramInfo->hints & NATIVE_PARAMETER_USES_SCALEPOINTS)
+            text += "        lv2:portProperty lv2:enumeration ;\n";
+        if ((paramInfo->hints & NATIVE_PARAMETER_IS_ENABLED) == 0)
             text += "        lv2:portProperty <" LV2_PORT_PROPS__notOnGUI "> ;\n";
-        }
 
         for (uint32_t j=0; j < paramInfo->scalePointCount; ++j)
         {
@@ -534,6 +554,69 @@ static void writePluginFile(const NativePluginDescriptor* const pluginDesc)
     text += "    doap:name \"" + String(pluginDesc->name) + "\" ;\n";
     text += "    doap:maintainer [ foaf:name \"" + String(pluginDesc->maker) + "\" ] .\n";
 
+#if 0
+    // -------------------------------------------------------------------
+    // Presets
+
+    if (pluginDesc->get_midi_program_count != nullptr && pluginDesc->get_midi_program_info != nullptr && pluginHandle != nullptr)
+    {
+        if (const uint32_t presetCount = pluginDesc->get_midi_program_count(pluginHandle))
+        {
+            const String presetsFile("carla.lv2/" + pluginLabel + "-presets.ttl");
+            std::fstream presetsStream(presetsFile.toRawUTF8(), std::ios::out);
+
+            String presetId, presetText;
+
+            presetText += "@prefix lv2: <http://lv2plug.in/ns/lv2core#> .\n";
+            presetText += "@prefix pset: <http://lv2plug.in/ns/ext/presets#> .\n";
+            presetText += "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n";
+
+            for (uint32_t i=0; i<presetCount; ++i)
+            {
+                const NativeMidiProgram* const midiProg(pluginDesc->get_midi_program_info(pluginHandle, i));
+                pluginDesc->set_midi_program(pluginHandle, 0, midiProg->bank, midiProg->program);
+
+                presetId = String::formatted("%03i", i+1);
+
+                text += "\n<http://kxstudio.sf.net/carla/plugins/" + pluginLabel + "#preset" + presetId + ">\n";
+                text += "    a pset:Preset ;\n";
+                text += "    lv2:appliesTo <http://kxstudio.sf.net/carla/plugins/" + pluginLabel + "> ;\n";
+                text += "    rdfs:seeAlso <" + pluginLabel + "-presets.ttl> .\n";
+
+                presetText += "\n<http://kxstudio.sf.net/carla/plugins/" + pluginLabel + "#preset" + presetId + ">\n";
+                presetText += "    a pset:Preset ;\n";
+                presetText += "    lv2:appliesTo <http://kxstudio.sf.net/carla/plugins/" + pluginLabel + "> ;\n";
+                presetText += "    rdfs:label \"" + String(midiProg->name) + "\" ;\n";
+
+                for (uint32_t j=0; j < paramCount; ++j)
+                {
+                    const NativeParameter* paramInfo(pluginDesc->get_parameter_info(pluginHandle, j));
+                    const String           paramName(paramInfo->name != nullptr ? paramInfo->name : "");
+                    const String           paramUnit(paramInfo->unit != nullptr ? paramInfo->unit : "");
+
+                    CARLA_SAFE_ASSERT_RETURN(paramInfo != nullptr,)
+
+                    if (j == 0)
+                        presetText += "    lv2:port [\n";
+
+                    presetText += "        lv2:symbol \"" + nameToSymbol(paramName, j) + "\" ;\n";
+                    presetText += "        pset:value " + String::formatted("%f", pluginDesc->get_parameter_value(pluginHandle, j)) + " ;\n";
+
+                    if (j+1 == paramCount)
+                        presetText += "    ] ;\n\n";
+                    else
+                        presetText += "    ] , [\n";
+                }
+
+                presetsStream << presetText.toRawUTF8();
+                presetText.clear();
+            }
+
+            presetsStream.close();
+        }
+    }
+#endif
+
     // -------------------------------------------------------------------
     // Write file now
 
@@ -556,7 +639,7 @@ int main()
 
     writeManifestFile(plm);
 
-    for (LinkedList<const NativePluginDescriptor*>::Itenerator it = plm.descs.begin(); it.valid(); it.next())
+    for (LinkedList<const NativePluginDescriptor*>::Itenerator it = plm.descs.begin2(); it.valid(); it.next())
     {
         const NativePluginDescriptor* const& pluginDesc(it.getValue());
         writePluginFile(pluginDesc);

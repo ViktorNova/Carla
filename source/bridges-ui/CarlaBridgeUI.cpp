@@ -20,8 +20,12 @@
 
 #include "CarlaBase64Utils.hpp"
 
-#undef NULL
-#define NULL nullptr
+// needed for atom-util
+#ifndef nullptr
+# undef NULL
+# define NULL nullptr
+#endif
+
 #include "lv2/atom-util.h"
 
 CARLA_BRIDGE_START_NAMESPACE
@@ -35,8 +39,7 @@ CarlaBridgeUI::CarlaBridgeUI() noexcept
       fLastMsgTimer(-1),
       fToolkit(nullptr),
       fLib(nullptr),
-      fLibFilename(),
-      leakDetector_CarlaBridgeUI()
+      fLibFilename()
 {
     carla_debug("CarlaBridgeUI::CarlaBridgeUI()");
 
@@ -179,11 +182,11 @@ bool CarlaBridgeUI::msgReceived(const char* const msg) noexcept
 
     if (std::strcmp(msg, "atom") == 0)
     {
-        uint32_t index, size;
+        uint32_t index, atomTotalSize;
         const char* base64atom;
 
         CARLA_SAFE_ASSERT_RETURN(readNextLineAsUInt(index), true);
-        CARLA_SAFE_ASSERT_RETURN(readNextLineAsUInt(size), true);
+        CARLA_SAFE_ASSERT_RETURN(readNextLineAsUInt(atomTotalSize), true);
         CARLA_SAFE_ASSERT_RETURN(readNextLineAsString(base64atom), true);
 
         std::vector<uint8_t> chunk(carla_getChunkFromBase64String(base64atom));
@@ -191,7 +194,10 @@ bool CarlaBridgeUI::msgReceived(const char* const msg) noexcept
         CARLA_SAFE_ASSERT_RETURN(chunk.size() >= sizeof(LV2_Atom), true);
 
         const LV2_Atom* const atom((const LV2_Atom*)chunk.data());
-        CARLA_SAFE_ASSERT_RETURN(lv2_atom_total_size(atom) == chunk.size(), true);
+        const uint32_t atomTotalSizeCheck(lv2_atom_total_size(atom));
+
+        CARLA_SAFE_ASSERT_RETURN(atomTotalSizeCheck == atomTotalSize, true);
+        CARLA_SAFE_ASSERT_RETURN(atomTotalSizeCheck == chunk.size(), true);
 
         dspAtomReceived(index, atom);
         return true;

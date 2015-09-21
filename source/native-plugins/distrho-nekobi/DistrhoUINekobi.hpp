@@ -1,6 +1,6 @@
 /*
  * DISTRHO Nekobi Plugin, based on Nekobee by Sean Bolton and others.
- * Copyright (C) 2013-2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2013-2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -49,12 +49,12 @@ protected:
     // -------------------------------------------------------------------
     // DSP Callbacks
 
-    void d_parameterChanged(uint32_t index, float value) override;
+    void parameterChanged(uint32_t index, float value) override;
 
     // -------------------------------------------------------------------
     // UI Callbacks
 
-    void d_uiIdle() override;
+    void uiIdle() override;
 
     // -------------------------------------------------------------------
     // Widget Callbacks

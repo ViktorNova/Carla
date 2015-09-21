@@ -24,16 +24,28 @@ from carla_config import *
 # ------------------------------------------------------------------------------------------------------------
 # Imports (Global)
 
+import json
+
 if config_UseQt5:
     from PyQt5.QtCore import pyqtSlot, QPoint, QThread, QSize, QUrl
-    from PyQt4.QtGui import QImage, QPainter
+    from PyQt5.QtGui import QImage, QPainter, QPalette
     from PyQt5.QtWidgets import QMainWindow
     from PyQt5.QtWebKitWidgets import QWebElement, QWebSettings, QWebView
 else:
     from PyQt4.QtCore import pyqtSlot, QPoint, QThread, QSize, QUrl
-    from PyQt4.QtGui import QImage, QPainter
+    from PyQt4.QtGui import QImage, QPainter, QPalette
     from PyQt4.QtGui import QMainWindow
     from PyQt4.QtWebKit import QWebElement, QWebSettings, QWebView
+
+# ------------------------------------------------------------------------------------------------------------
+# Imports (tornado)
+
+from pystache import render as pyrender
+from tornado.gen import engine
+from tornado.log import enable_pretty_logging
+from tornado.ioloop import IOLoop
+from tornado.web import asynchronous, HTTPError
+from tornado.web import Application, RequestHandler, StaticFileHandler
 
 # ------------------------------------------------------------------------------------------------------------
 # Imports (Custom)
@@ -52,50 +64,158 @@ PORTn = 8998 + int(random()*9000)
 # Set up environment for the webserver
 
 PORT     = str(PORTn)
-ROOT     = "/usr/share"
-#ROOT     = "/home/falktx/Personal/FOSS/Git-mine/mod-app/source/modules"
+ROOT     = "/usr/share/mod"
+#ROOT     = "/home/falktx/FOSS/GIT-mine/MOD/mod-app/source/modules/mod-ui"
 DATA_DIR = os.path.expanduser("~/.local/share/mod-data/")
+HTML_DIR = os.path.join(ROOT, "html")
 
 os.environ['MOD_DEV_HOST'] = "1"
 os.environ['MOD_DEV_HMI']  = "1"
 os.environ['MOD_DESKTOP']  = "1"
-os.environ['MOD_LOG']      = "0"
+os.environ['MOD_LOG']      = "1" # TESTING
 
 os.environ['MOD_DATA_DIR']           = DATA_DIR
-os.environ['MOD_HTML_DIR']           = os.path.join(ROOT, "mod-ui", "html")
-os.environ['MOD_PLUGIN_LIBRARY_DIR'] = os.path.join(DATA_DIR, 'lib')
+os.environ['MOD_HTML_DIR']           = HTML_DIR
+os.environ['MOD_KEY_PATH']           = os.path.join(DATA_DIR, "keys")
+os.environ['MOD_CLOUD_PUB']          = os.path.join(ROOT, "keys", "cloud_key.pub")
+os.environ['MOD_PLUGIN_LIBRARY_DIR'] = os.path.join(DATA_DIR, "lib")
 
-os.environ['MOD_PHANTOM_BINARY']        = "/usr/bin/phantomjs"
-os.environ['MOD_SCREENSHOT_JS']         = os.path.join(ROOT, "mod-ui", "screenshot.js")
-os.environ['MOD_DEVICE_WEBSERVER_PORT'] = PORT
-
-# FIXME
 os.environ['MOD_DEFAULT_JACK_BUFSIZE']  = "0"
-
-#sys.path = [os.path.join(ROOT, "mod-ui")] + sys.path
+os.environ['MOD_PHANTOM_BINARY']        = "/usr/bin/phantomjs"
+os.environ['MOD_SCREENSHOT_JS']         = os.path.join(ROOT, "screenshot.js")
+os.environ['MOD_DEVICE_WEBSERVER_PORT'] = PORT
 
 # ------------------------------------------------------------------------------------------------------------
 # Imports (MOD)
 
-from mod import webserver
-from mod.lv2 import PluginSerializer
-from mod.session import SESSION
+from mod.lv2 import get_plugin_info, init as lv2_init
 
-# Dummy monitor var, we don't need it
-SESSION.monitor_server = "skip"
+# ------------------------------------------------------------------------------------------------------------
+# MOD related classes
+
+class EffectGet(RequestHandler):
+    def get(self):
+        uri = self.get_argument('uri')
+
+        try:
+            data = get_plugin_info(uri)
+        except:
+            raise HTTPError(404)
+
+        self.set_header('Content-type', 'application/json')
+        self.write(json.dumps(data))
+
+class EffectResource(StaticFileHandler):
+
+    def initialize(self):
+        # Overrides StaticFileHandler initialize
+        pass
+
+    def get(self, path):
+        try:
+            uri = self.get_argument('uri')
+        except:
+            return self.shared_resource(path)
+
+        try:
+            data = get_plugin_info(uri)
+        except:
+            raise HTTPError(404)
+
+        try:
+            root = data['gui']['resourcesDirectory']
+        except:
+            raise HTTPError(404)
+
+        try:
+            super(EffectResource, self).initialize(root)
+            super(EffectResource, self).get(path)
+        except HTTPError as e:
+            if e.status_code != 404:
+                raise e
+            self.shared_resource(path)
+        except IOError:
+            raise HTTPError(404)
+
+    def shared_resource(self, path):
+        super(EffectResource, self).initialize(os.path.join(HTML_DIR, 'resources'))
+        super(EffectResource, self).get(path)
+
+class EffectStylesheet(RequestHandler):
+    def get(self):
+        uri = self.get_argument('uri')
+
+        try:
+            data = get_plugin_info(uri)
+        except:
+            raise HTTPError(404)
+
+        try:
+            path = data['gui']['stylesheet']
+        except:
+            raise HTTPError(404)
+
+        if not os.path.exists(path):
+            raise HTTPError(404)
+
+        with open(path, 'rb') as fd:
+            self.set_header('Content-type', 'text/css')
+            self.write(fd.read())
+
+class EffectJavascript(RequestHandler):
+    def get(self):
+        uri = self.get_argument('uri')
+
+        try:
+            data = get_plugin_info(uri)
+        except:
+            raise HTTPError(404)
+
+        try:
+            path = data['gui']['javascript']
+        except:
+            raise HTTPError(404)
+
+        if not os.path.exists(path):
+            raise HTTPError(404)
+
+        with open(path, 'rb') as fd:
+            self.set_header('Content-type', 'text/javascript')
+            self.write(fd.read())
 
 # ------------------------------------------------------------------------------------------------------------
 # WebServer Thread
 
 class WebServerThread(QThread):
+    # signals
+    running = pyqtSignal()
+
     def __init__(self, parent=None):
         QThread.__init__(self, parent)
 
+        self.fApplication = Application(
+            [
+                (r"/effect/get/?", EffectGet),
+                (r"/effect/stylesheet.css", EffectStylesheet),
+                (r"/effect/gui.js", EffectJavascript),
+                (r"/resources/(.*)", EffectResource),
+                (r"/(.*)", StaticFileHandler, {"path": HTML_DIR}),
+            ],
+            debug=True)
+
+        self.fPrepareWasCalled = False
+
     def run(self):
-        webserver.run()
+        if not self.fPrepareWasCalled:
+            self.fPrepareWasCalled = True
+            self.fApplication.listen(PORT, address="0.0.0.0")
+            enable_pretty_logging()
+
+        self.running.emit()
+        IOLoop.instance().start()
 
     def stopWait(self):
-        webserver.stop()
+        IOLoop.instance().stop()
         return self.wait(5000)
 
 # ------------------------------------------------------------------------------------------------------------
@@ -125,14 +245,14 @@ class HostWindow(QMainWindow):
         self.fQuitReceived = False
         self.fWasRepainted = False
 
-        self.fPlugin      = PluginSerializer(URI)
-        self.fPorts       = self.fPlugin.data['ports']
+        self.fPlugin      = get_plugin_info(URI)
+        self.fPorts       = self.fPlugin['ports']
         self.fPortSymbols = {}
         self.fPortValues  = {}
 
         for port in self.fPorts['control']['input'] + self.fPorts['control']['output']:
             self.fPortSymbols[port['index']] = port['symbol']
-            self.fPortValues [port['index']] = port['default']
+            self.fPortValues [port['index']] = port['ranges']['default']
 
         # ----------------------------------------------------------------------------------------------------
         # Init pipe
@@ -151,9 +271,12 @@ class HostWindow(QMainWindow):
         # ----------------------------------------------------------------------------------------------------
         # Set up GUI
 
-        self.fWebview = QWebView(self)
-        self.setCentralWidget(self.fWebview)
         self.setContentsMargins(0, 0, 0, 0)
+
+        self.fWebview = QWebView(self)
+        #self.fWebview.setAttribute(Qt.WA_OpaquePaintEvent, False)
+        #self.fWebview.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setCentralWidget(self.fWebview)
 
         page = self.fWebview.page()
         page.setViewportSize(QSize(980, 600))
@@ -162,12 +285,18 @@ class HostWindow(QMainWindow):
         mainFrame.setScrollBarPolicy(Qt.Horizontal, Qt.ScrollBarAlwaysOff)
         mainFrame.setScrollBarPolicy(Qt.Vertical, Qt.ScrollBarAlwaysOff)
 
+        palette = self.fWebview.palette()
+        palette.setBrush(QPalette.Base, palette.brush(QPalette.Window))
+        page.setPalette(palette)
+        self.fWebview.setPalette(palette)
+
         settings = self.fWebview.settings()
         settings.setAttribute(QWebSettings.DeveloperExtrasEnabled, True)
 
         self.fWebview.loadFinished.connect(self.slot_webviewLoadFinished)
 
-        url = "http://127.0.0.1:%s/icon.html?v=0#%s" % (PORT, URI)
+        url = "http://127.0.0.1:%s/icon.html#%s" % (PORT, URI)
+        print("url:", url)
         self.fWebview.load(QUrl(url))
 
         # ----------------------------------------------------------------------------------------------------
@@ -230,39 +359,42 @@ class HostWindow(QMainWindow):
         #image.save("/tmp/test.png")
 
         # get coordinates and size from image
-        x = -1
+        #x = -1
         #y = -1
-        lastx = -1
-        lasty = -1
+        #lastx = -1
+        #lasty = -1
+        #bgcol = self.fHostColor.rgba()
 
-        for h in range(0, image.height()):
-            hasNonTransPixels = False
+        #for h in range(0, image.height()):
+            #hasNonTransPixels = False
 
-            for w in range(0, image.width()):
-                if image.pixel(w, h) not in (0, 0xff070707):
-                    hasNonTransPixels = True
-                    if x == -1 or x > w:
-                        x = w
-                    lastx = max(lastx, w)
+            #for w in range(0, image.width()):
+                #if image.pixel(w, h) not in (0, bgcol): # 0xff070707):
+                    #hasNonTransPixels = True
+                    #if x == -1 or x > w:
+                        #x = w
+                    #lastx = max(lastx, w)
 
-            if hasNonTransPixels:
-                #if y == -1:
-                    #y = h
-                lasty = h
+            #if hasNonTransPixels:
+                ##if y == -1:
+                    ##y = h
+                #lasty = h
 
         # set size and position accordingly
-        if -1 not in (x, lastx, lasty):
-            self.setFixedSize(lastx-x, lasty)
-            self.fCurrentFrame.setScrollPosition(QPoint(x, 0))
-        else:
+        #if -1 not in (x, lastx, lasty):
+            #self.setFixedSize(lastx-x, lasty)
+            #self.fCurrentFrame.setScrollPosition(QPoint(x, 0))
+        #else:
+
+        # TODO that^ needs work
+        if True:
             self.setFixedSize(size)
-            self.fCurrentFrame.setScrollPosition(QPoint(15, 0))
 
         # set initial values
         for index in self.fPortValues.keys():
             symbol = self.fPortSymbols[index]
             value  = self.fPortValues[index]
-            self.fCurrentFrame.evaluateJavaScript("icongui.setPortValue('%s', %f)" % (symbol, value))
+            self.fCurrentFrame.evaluateJavaScript("icongui.setPortValue('%s', %f, null)" % (symbol, value))
 
         # final setup
         self.fCanSetValues = True
@@ -380,9 +512,9 @@ class HostWindow(QMainWindow):
     def dspParameterChanged(self, index, value):
         self.fPortValues[index] = value
 
-        if self.fCurrentFrame is not None:
+        if self.fCurrentFrame is not None and self.fCanSetValues:
             symbol = self.fPortSymbols[index]
-            self.fCurrentFrame.evaluateJavaScript("icongui.setPortValue('%s', %f)" % (symbol, value))
+            self.fCurrentFrame.evaluateJavaScript("icongui.setPortValue('%s', %f, null)" % (symbol, value))
 
     def dspProgramChanged(self, index):
         return
@@ -431,6 +563,9 @@ class HostWindow(QMainWindow):
     def closeEvent(self, event):
         self.closeExternalUI()
         QMainWindow.closeEvent(self, event)
+
+        # there might be other qt windows open which will block carla-modgui from quitting
+        app.quit()
 
     def timerEvent(self, event):
         if event.timerId() == self.fIdleTimer:
@@ -490,8 +625,8 @@ if __name__ == '__main__':
     # -------------------------------------------------------------
     # Read CLI args
 
-    if len(sys.argv) < 3:
-        print("usage: %s <plugin-uri> <ui-uri>" % sys.argv[0])
+    if len(sys.argv) < 2:
+        print("usage: %s <plugin-uri>" % sys.argv[0])
         sys.exit(1)
 
     libPrefix = os.getenv("CARLA_LIB_PREFIX")
@@ -515,6 +650,11 @@ if __name__ == '__main__':
     # Set-up custom signal handling
 
     setUpSignals()
+
+    # -------------------------------------------------------------
+    # Init LV2
+
+    lv2_init()
 
     # -------------------------------------------------------------
     # Create GUI

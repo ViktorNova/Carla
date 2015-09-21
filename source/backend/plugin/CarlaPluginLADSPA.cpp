@@ -1,6 +1,6 @@
 ﻿/*
- * Carla LADSPA Plugin
- * Copyright (C) 2011-2014 Filipe Coelho <falktx@falktx.com>
+ * Carla Plugin, LADSPA implementation
+ * Copyright (C) 2011-2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -38,10 +38,9 @@ public:
           fExtraStereoBuffer(),
           fParamBuffers(nullptr),
           fLatencyIndex(-1),
-          fIsDssiVst(false),
           fForcedStereoIn(false),
           fForcedStereoOut(false),
-          leakDetector_CarlaPluginLADSPA()
+          fIsDssiVst(false)
     {
         carla_debug("CarlaPluginLADSPA::CarlaPluginLADSPA(%p, %i)", engine, id);
 
@@ -68,7 +67,7 @@ public:
         {
             if (fDescriptor->cleanup != nullptr)
             {
-                for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin(); it.valid(); it.next())
+                for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin2(); it.valid(); it.next())
                 {
                     LADSPA_Handle const handle(it.getValue(nullptr));
                     CARLA_SAFE_ASSERT_CONTINUE(handle != nullptr);
@@ -426,6 +425,7 @@ public:
     {
         CARLA_SAFE_ASSERT_RETURN(pData->engine != nullptr,);
         CARLA_SAFE_ASSERT_RETURN(fDescriptor != nullptr,);
+        CARLA_SAFE_ASSERT_RETURN(fHandles.count() > 0,);
         carla_debug("CarlaPluginLADSPA::reload() - start");
 
         const EngineProcessMode processMode(pData->engine->getProccessMode());
@@ -561,26 +561,26 @@ public:
                 if (LADSPA_IS_PORT_INPUT(portType))
                 {
                     const uint32_t j = iAudioIn++;
-                    pData->audioIn.ports[j].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, true);
+                    pData->audioIn.ports[j].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, true, j);
                     pData->audioIn.ports[j].rindex = i;
 
                     if (forcedStereoIn)
                     {
                         portName += "_2";
-                        pData->audioIn.ports[1].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, true);
+                        pData->audioIn.ports[1].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, true, 1);
                         pData->audioIn.ports[1].rindex = i;
                     }
                 }
                 else if (LADSPA_IS_PORT_OUTPUT(portType))
                 {
                     const uint32_t j = iAudioOut++;
-                    pData->audioOut.ports[j].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false);
+                    pData->audioOut.ports[j].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false, j);
                     pData->audioOut.ports[j].rindex = i;
 
                     if (forcedStereoOut)
                     {
                         portName += "_2";
-                        pData->audioOut.ports[1].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false);
+                        pData->audioOut.ports[1].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false, 1);
                         pData->audioOut.ports[1].rindex = i;
                     }
                 }
@@ -609,14 +609,16 @@ public:
                 else
                     max = 1.0f;
 
-                if (min > max)
+                if (LADSPA_IS_HINT_SAMPLE_RATE(portRangeHints.HintDescriptor))
                 {
-                    carla_stderr2("WARNING - Broken plugin parameter '%s': min > max", paramName);
-                    min = max - 0.1f;
+                    min *= sampleRate;
+                    max *= sampleRate;
+                    pData->param.data[j].hints |= PARAMETER_USES_SAMPLERATE;
                 }
-                else if (carla_compareFloats(min, max))
+
+                if (min >= max)
                 {
-                    carla_stderr2("WARNING - Broken plugin parameter '%s': min == max", paramName);
+                    carla_stderr2("WARNING - Broken plugin parameter '%s': min >= max", paramName);
                     max = min + 0.1f;
                 }
 
@@ -630,14 +632,6 @@ public:
                     def = min;
                 else if (def > max)
                     def = max;
-
-                if (LADSPA_IS_HINT_SAMPLE_RATE(portRangeHints.HintDescriptor))
-                {
-                    min *= sampleRate;
-                    max *= sampleRate;
-                    def *= sampleRate;
-                    pData->param.data[j].hints |= PARAMETER_USES_SAMPLERATE;
-                }
 
                 if (LADSPA_IS_HINT_TOGGLED(portRangeHints.HintDescriptor))
                 {
@@ -713,7 +707,7 @@ public:
                 // Start parameters in their default values
                 fParamBuffers[j] = def;
 
-                for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin(); it.valid(); it.next())
+                for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin2(); it.valid(); it.next())
                 {
                     LADSPA_Handle const handle(it.getValue(nullptr));
                     CARLA_SAFE_ASSERT_CONTINUE(handle != nullptr);
@@ -728,7 +722,7 @@ public:
                 // Not Audio or Control
                 carla_stderr2("ERROR - Got a broken Port (neither Audio or Control)");
 
-                for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin(); it.valid(); it.next())
+                for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin2(); it.valid(); it.next())
                 {
                     LADSPA_Handle const handle(it.getValue(nullptr));
                     CARLA_SAFE_ASSERT_CONTINUE(handle != nullptr);
@@ -753,7 +747,7 @@ public:
             portName += "events-in";
             portName.truncate(portNameSize);
 
-            pData->event.portIn = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, true);
+            pData->event.portIn = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, true, 0);
         }
 
         if (needsCtrlOut)
@@ -769,7 +763,7 @@ public:
             portName += "events-out";
             portName.truncate(portNameSize);
 
-            pData->event.portOut = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, false);
+            pData->event.portOut = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, false, 0);
         }
 
         if (forcedStereoIn || forcedStereoOut)
@@ -879,7 +873,7 @@ public:
 
         if (fDescriptor->activate != nullptr)
         {
-            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin(); it.valid(); it.next())
+            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin2(); it.valid(); it.next())
             {
                 LADSPA_Handle const handle(it.getValue(nullptr));
                 CARLA_SAFE_ASSERT_CONTINUE(handle != nullptr);
@@ -897,7 +891,7 @@ public:
 
         if (fDescriptor->deactivate != nullptr)
         {
-            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin(); it.valid(); it.next())
+            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin2(); it.valid(); it.next())
             {
                 LADSPA_Handle const handle(it.getValue(nullptr));
                 CARLA_SAFE_ASSERT_CONTINUE(handle != nullptr);
@@ -1105,7 +1099,8 @@ public:
         } // End of Control Output
     }
 
-    bool processSingle(const float** const audioIn, float** const audioOut, const uint32_t frames, const uint32_t timeOffset)
+    bool processSingle(const float** const audioIn, float** const audioOut, const uint32_t frames,
+                       const uint32_t timeOffset)
     {
         CARLA_SAFE_ASSERT_RETURN(frames > 0, false);
 
@@ -1171,7 +1166,7 @@ public:
         // Run plugin
 
         uint instn = 0;
-        for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin(); it.valid(); it.next(), ++instn)
+        for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin2(); it.valid(); it.next(), ++instn)
         {
             LADSPA_Handle const handle(it.getValue(nullptr));
             CARLA_SAFE_ASSERT_CONTINUE(handle != nullptr);
@@ -1209,8 +1204,8 @@ public:
         // Post-processing (dry/wet, volume and balance)
 
         {
-            const bool doDryWet  = (pData->hints & PLUGIN_CAN_DRYWET) != 0 && ! carla_compareFloats(pData->postProc.dryWet, 1.0f);
-            const bool doBalance = (pData->hints & PLUGIN_CAN_BALANCE) != 0 && ! (carla_compareFloats(pData->postProc.balanceLeft, -1.0f) && carla_compareFloats(pData->postProc.balanceRight, 1.0f));
+            const bool doDryWet  = (pData->hints & PLUGIN_CAN_DRYWET) != 0 && carla_isNotEqual(pData->postProc.dryWet, 1.0f);
+            const bool doBalance = (pData->hints & PLUGIN_CAN_BALANCE) != 0 && ! (carla_isEqual(pData->postProc.balanceLeft, -1.0f) && carla_isEqual(pData->postProc.balanceRight, 1.0f));
             const bool isMono    = (pData->audioIn.count == 1);
 
             bool isPair;
@@ -1381,7 +1376,7 @@ public:
 
         if (fDescriptor->cleanup == nullptr)
         {
-            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin(); it.valid(); it.next())
+            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin2(); it.valid(); it.next())
             {
                 LADSPA_Handle const handle(it.getValue(nullptr));
                 CARLA_SAFE_ASSERT_CONTINUE(handle != nullptr);
@@ -1425,7 +1420,7 @@ public:
         }
         else
         {
-            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin(); it.valid(); it.next())
+            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin2(); it.valid(); it.next())
             {
                 LADSPA_Handle const handle(it.getValue(nullptr));
                 CARLA_SAFE_ASSERT_CONTINUE(handle != nullptr);
@@ -1457,7 +1452,7 @@ public:
         }
         else
         {
-            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin(); it.valid(); it.next())
+            for (LinkedList<LADSPA_Handle>::Itenerator it = fHandles.begin2(); it.valid(); it.next())
             {
                 LADSPA_Handle const handle(it.getValue(nullptr));
                 CARLA_SAFE_ASSERT_CONTINUE(handle != nullptr);
@@ -1534,11 +1529,6 @@ public:
 
     // -------------------------------------------------------------------
 
-    void* getNativeHandle() const noexcept override
-    {
-        return nullptr; // fHandle;
-    }
-
     const void* getNativeDescriptor() const noexcept override
     {
         return fDescriptor;
@@ -1576,8 +1566,6 @@ public:
             pData->engine->setLastError("null label");
             return false;
         }
-
-        fIsDssiVst = CarlaString(filename).contains("dssi-vst", true);
 
         // ---------------------------------------------------------------
         // open DLL
@@ -1700,6 +1688,11 @@ public:
         }
 
         // ---------------------------------------------------------------
+        // check if this is dssi-vst
+
+        fIsDssiVst = CarlaString(filename).contains("dssi-vst", true);
+
+        // ---------------------------------------------------------------
         // set default options
 
         pData->options = 0x0;
@@ -1730,9 +1723,9 @@ private:
     float*  fParamBuffers;
 
     int32_t fLatencyIndex; // -1 if invalid
-    bool    fIsDssiVst;
     bool    fForcedStereoIn;
     bool    fForcedStereoOut;
+    bool    fIsDssiVst;
 
     // -------------------------------------------------------------------
 
@@ -1786,7 +1779,8 @@ private:
         return false;
     }
 
-    static bool _getSeparatedParameterNameOrUnitImpl(const char* const paramName, char* const strBuf, const bool wantName, const bool useBracket) noexcept
+    static bool _getSeparatedParameterNameOrUnitImpl(const char* const paramName, char* const strBuf,
+                                                     const bool wantName, const bool useBracket) noexcept
     {
         const char* const sepBracketStart(std::strstr(paramName, useBracket ? " [" : " ("));
 
@@ -1806,7 +1800,7 @@ private:
         const std::size_t sepIndex(std::strlen(paramName)-unitSize-3);
 
         // just in case
-        if (sepIndex >= STR_MAX)
+        if (sepIndex+2 >= STR_MAX)
             return false;
 
         if (wantName)
@@ -1832,30 +1826,12 @@ private:
 
 CarlaPlugin* CarlaPlugin::newLADSPA(const Initializer& init, const LADSPA_RDF_Descriptor* const rdfDescriptor)
 {
-    carla_debug("CarlaPlugin::newLADSPA({%p, \"%s\", \"%s\", \"%s\", " P_INT64 ", %x}, %p)", init.engine, init.filename, init.name, init.label, init.uniqueId, init.options, rdfDescriptor);
+    carla_debug("CarlaPlugin::newLADSPA({%p, \"%s\", \"%s\", \"%s\", " P_INT64 ", %x}, %p)",
+                init.engine, init.filename, init.name, init.label, init.uniqueId, init.options, rdfDescriptor);
 
     CarlaPluginLADSPA* const plugin(new CarlaPluginLADSPA(init.engine, init.id));
 
     if (! plugin->init(init.filename, init.name, init.label, init.options, rdfDescriptor))
-    {
-        delete plugin;
-        return nullptr;
-    }
-
-    plugin->reload();
-
-    bool canRun = true;
-
-    if (init.engine->getProccessMode() == ENGINE_PROCESS_MODE_CONTINUOUS_RACK)
-    {
-        if (! plugin->canRunInRack())
-        {
-            init.engine->setLastError("Carla's rack mode can only work with Mono or Stereo LADSPA plugins, sorry!");
-            canRun = false;
-        }
-    }
-
-    if (! canRun)
     {
         delete plugin;
         return nullptr;

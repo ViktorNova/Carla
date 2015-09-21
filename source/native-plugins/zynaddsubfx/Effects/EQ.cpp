@@ -23,9 +23,10 @@
 #include <cmath>
 #include "EQ.h"
 #include "../DSP/AnalogFilter.h"
+#include "../Misc/Allocator.h"
 
-EQ::EQ(bool insertion_, float *efxoutl_, float *efxoutr_, unsigned int srate, int bufsize)
-    :Effect(insertion_, efxoutl_, efxoutr_, NULL, 0, srate, bufsize)
+EQ::EQ(EffectParams pars)
+    :Effect(pars)
 {
     for(int i = 0; i < MAX_EQ_BANDS; ++i) {
         filter[i].Ptype   = 0;
@@ -33,8 +34,8 @@ EQ::EQ(bool insertion_, float *efxoutl_, float *efxoutr_, unsigned int srate, in
         filter[i].Pgain   = 64;
         filter[i].Pq      = 64;
         filter[i].Pstages = 0;
-        filter[i].l = new AnalogFilter(6, 1000.0f, 1.0f, 0, srate, bufsize);
-        filter[i].r = new AnalogFilter(6, 1000.0f, 1.0f, 0, srate, bufsize);
+        filter[i].l = memory.alloc<AnalogFilter>(6, 1000.0f, 1.0f, 0, pars.srate, pars.bufsize);
+        filter[i].r = memory.alloc<AnalogFilter>(6, 1000.0f, 1.0f, 0, pars.srate, pars.bufsize);
     }
     //default values
     Pvolume = 50;
@@ -43,6 +44,13 @@ EQ::EQ(bool insertion_, float *efxoutl_, float *efxoutr_, unsigned int srate, in
     cleanup();
 }
 
+EQ::~EQ()
+{
+       for(int i = 0; i < MAX_EQ_BANDS; ++i) {
+           memory.dealloc(filter[i].l);
+           memory.dealloc(filter[i].r);
+       }
+}
 
 // Cleanup the effect
 void EQ::cleanup(void)
@@ -195,4 +203,28 @@ float EQ::getfreqresponse(float freq)
         resp *= filter[i].l->H(freq);
     }
     return rap2dB(resp * outvolume);
+}
+
+//Not exactly the most efficient manner to derive the total taps, but it should
+//be fast enough in practice
+void EQ::getFilter(float *a, float *b) const
+{
+    a[0] = 1;
+    b[0] = 1;
+    off_t off=0;
+    for(int i = 0; i < MAX_EQ_BANDS; ++i) {
+        auto &F = filter[i];
+        if(F.Ptype == 0)
+            continue;
+        const double Fb[3] = {F.l->coeff.c[0], F.l->coeff.c[1], F.l->coeff.c[2]};
+        const double Fa[3] = {1.0f, -F.l->coeff.d[1], -F.l->coeff.d[2]};
+
+        for(int j=0; j<F.Pstages+1; ++j) {
+            for(int k=0; k<3; ++k) {
+                a[off] = Fa[k];
+                b[off] = Fb[k];
+                off++;
+            }
+        }
+    }
 }

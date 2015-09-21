@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Common Carla code
-# Copyright (C) 2011-2014 Filipe Coelho <falktx@falktx.com>
+# Copyright (C) 2011-2015 Filipe Coelho <falktx@falktx.com>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -20,6 +20,10 @@
 # Imports (Config)
 
 from carla_config import *
+
+# These will be modified during install
+X_LIBDIR_X = None
+X_DATADIR_X = None
 
 # ------------------------------------------------------------------------------------------------------------
 # Imports (Global)
@@ -215,7 +219,6 @@ CARLA_KEY_PATHS_DSSI   = "Paths/DSSI"
 CARLA_KEY_PATHS_LV2    = "Paths/LV2"
 CARLA_KEY_PATHS_VST2   = "Paths/VST2"
 CARLA_KEY_PATHS_VST3   = "Paths/VST3"
-CARLA_KEY_PATHS_AU     = "Paths/AU"
 CARLA_KEY_PATHS_GIG    = "Paths/GIG"
 CARLA_KEY_PATHS_SF2    = "Paths/SF2"
 CARLA_KEY_PATHS_SFZ    = "Paths/SFZ"
@@ -249,7 +252,7 @@ CARLA_DEFAULT_CANVAS_HQ_ANTIALIASING   = False
 # Engine
 CARLA_DEFAULT_FORCE_STEREO          = False
 CARLA_DEFAULT_PREFER_PLUGIN_BRIDGES = False
-CARLA_DEFAULT_PREFER_UI_BRIDGES     = True
+CARLA_DEFAULT_PREFER_UI_BRIDGES     = bool(not WINDOWS)
 CARLA_DEFAULT_UIS_ALWAYS_ON_TOP     = False
 CARLA_DEFAULT_MAX_PARAMETERS        = MAX_DEFAULT_PARAMETERS
 CARLA_DEFAULT_UI_BRIDGES_TIMEOUT    = 4000
@@ -269,7 +272,7 @@ if LINUX:
     CARLA_DEFAULT_PROCESS_MODE   = ENGINE_PROCESS_MODE_MULTIPLE_CLIENTS
     CARLA_DEFAULT_TRANSPORT_MODE = ENGINE_TRANSPORT_MODE_JACK
 else:
-    CARLA_DEFAULT_PROCESS_MODE   = ENGINE_PROCESS_MODE_CONTINUOUS_RACK
+    CARLA_DEFAULT_PROCESS_MODE   = ENGINE_PROCESS_MODE_PATCHBAY
     CARLA_DEFAULT_TRANSPORT_MODE = ENGINE_TRANSPORT_MODE_INTERNAL
 
 # ------------------------------------------------------------------------------------------------------------
@@ -280,7 +283,6 @@ DEFAULT_DSSI_PATH   = ""
 DEFAULT_LV2_PATH    = ""
 DEFAULT_VST2_PATH   = ""
 DEFAULT_VST3_PATH   = ""
-DEFAULT_AU_PATH     = ""
 DEFAULT_GIG_PATH    = ""
 DEFAULT_SF2_PATH    = ""
 DEFAULT_SFZ_PATH    = ""
@@ -373,9 +375,6 @@ elif MACOS:
     DEFAULT_VST3_PATH    = HOME + "/Library/Audio/Plug-Ins/VST3"
     DEFAULT_VST3_PATH   += ":/Library/Audio/Plug-Ins/VST3"
 
-    DEFAULT_AU_PATH      = HOME + "/Library/Audio/Plug-Ins/Components"
-    DEFAULT_AU_PATH     += ":/Library/Audio/Plug-Ins/Components"
-
 else:
     splitter = ":"
 
@@ -451,7 +450,6 @@ if readEnvVars:
     CARLA_DEFAULT_LV2_PATH    = os.getenv("LV2_PATH",    DEFAULT_LV2_PATH).split(splitter)
     CARLA_DEFAULT_VST2_PATH   = os.getenv("VST_PATH",    DEFAULT_VST2_PATH).split(splitter)
     CARLA_DEFAULT_VST3_PATH   = os.getenv("VST3_PATH",   DEFAULT_VST3_PATH).split(splitter)
-    CARLA_DEFAULT_AU_PATH     = os.getenv("AU_PATH",     DEFAULT_AU_PATH).split(splitter)
     CARLA_DEFAULT_GIG_PATH    = os.getenv("GIG_PATH",    DEFAULT_GIG_PATH).split(splitter)
     CARLA_DEFAULT_SF2_PATH    = os.getenv("SF2_PATH",    DEFAULT_SF2_PATH).split(splitter)
     CARLA_DEFAULT_SFZ_PATH    = os.getenv("SFZ_PATH",    DEFAULT_SFZ_PATH).split(splitter)
@@ -462,7 +460,6 @@ else:
     CARLA_DEFAULT_LV2_PATH    = DEFAULT_LV2_PATH.split(splitter)
     CARLA_DEFAULT_VST2_PATH   = DEFAULT_VST2_PATH.split(splitter)
     CARLA_DEFAULT_VST3_PATH   = DEFAULT_VST3_PATH.split(splitter)
-    CARLA_DEFAULT_AU_PATH     = DEFAULT_AU_PATH.split(splitter)
     CARLA_DEFAULT_GIG_PATH    = DEFAULT_GIG_PATH.split(splitter)
     CARLA_DEFAULT_SF2_PATH    = DEFAULT_SF2_PATH.split(splitter)
     CARLA_DEFAULT_SFZ_PATH    = DEFAULT_SFZ_PATH.split(splitter)
@@ -475,7 +472,6 @@ del DEFAULT_DSSI_PATH
 del DEFAULT_LV2_PATH
 del DEFAULT_VST2_PATH
 del DEFAULT_VST3_PATH
-del DEFAULT_AU_PATH
 del DEFAULT_GIG_PATH
 del DEFAULT_SF2_PATH
 del DEFAULT_SFZ_PATH
@@ -485,12 +481,16 @@ del DEFAULT_SFZ_PATH
 
 class CarlaObject(object):
     __slots__ = [
-        'gui',  # Host Window
-        'utils' # Utils object
+        'gui',   # Host Window
+        'nogui', # Skip UI
+        'term',  # Terminated by OS signal
+        'utils'  # Utils object
     ]
 
 gCarla = CarlaObject()
 gCarla.gui   = None
+gCarla.nogui = False
+gCarla.term  = False
 gCarla.utils = None
 
 # ------------------------------------------------------------------------------------------------------------
@@ -504,6 +504,9 @@ if not CWD:
 # make it work with cxfreeze
 if os.path.isfile(CWD):
     CWD = os.path.dirname(CWD)
+    CXFREEZE = True
+else:
+    CXFREEZE = False
 
 # ------------------------------------------------------------------------------------------------------------
 # Set DLL_EXTENSION
@@ -543,15 +546,83 @@ def getIcon(icon, size = 16):
     return QIcon.fromTheme(icon, QIcon(":/%ix%i/%s.png" % (size, size, icon)))
 
 # ------------------------------------------------------------------------------------------------------------
+# Handle some basic command-line arguments shared between all carla variants
+
+def handleInitialCommandLineArguments(file):
+    initName  = os.path.basename(file) if (file is not None and os.path.dirname(file) in PATH) else sys.argv[0]
+    libPrefix = None
+
+    for arg in sys.argv[1:]:
+        if arg.startswith("--with-appname="):
+            initName = os.path.basename(arg.replace("--with-initname=", ""))
+
+        elif arg.startswith("--with-libprefix="):
+            libPrefix = arg.replace("--with-libprefix=", "")
+
+        elif arg == "--gdb":
+            pass
+
+        elif arg in ("-n", "--n", "-no-gui", "--no-gui", "-nogui", "--nogui"):
+            gCarla.nogui = True
+
+        elif arg in ("-h", "--h", "-help", "--help"):
+            print("Usage: %s [OPTION]... [FILE|URL]" % initName)
+            print("")
+            print(" where FILE can be a Carla project or preset file to be loaded, or URL if using Carla-Control")
+            print("")
+            print(" and OPTION can be one or more of the following:")
+            print("")
+            print("    --gdb    \t Run Carla inside gdb.")
+            print(" -n,--no-gui \t Run Carla headless, don't show UI.")
+            print("")
+            print(" -h,--help   \t Print this help text and exit.")
+            print(" -v,--version\t Print version information and exit.")
+            print("")
+
+            sys.exit(0)
+
+        elif arg in ("-v", "--v", "-version", "--version"):
+            pathBinaries, pathResources = getPaths(libPrefix)
+
+            print("Using Carla version %s" % VERSION)
+            print("  Python version: %s" % sys.version.split(" ",1)[0])
+            print("  Qt version:     %s" % qVersion())
+            print("  PyQt version:   %s" % PYQT_VERSION_STR)
+            print("  Binary dir:     %s" % pathBinaries)
+            print("  Resources dir:  %s" % pathResources)
+
+            sys.exit(0)
+
+    return (initName, libPrefix)
+
+# ------------------------------------------------------------------------------------------------------------
+# Get initial project file (as passed in the command-line parameters)
+
+def getInitialProjectFile(app, skipExistCheck = False):
+    for arg in app.arguments()[1:]:
+        if arg.startswith("--with-appname=") or arg.startswith("--with-libprefix=") or arg == "--gdb":
+            continue
+        if arg in ("-n", "--n", "-no-gui", "--no-gui", "-nogui", "--nogui"):
+            continue
+        if skipExistCheck or os.path.exists(arg):
+            return arg
+
+    return None
+
+# ------------------------------------------------------------------------------------------------------------
 # Get paths (binaries, resources)
 
 def getPaths(libPrefix = None):
     CWDl = CWD.lower()
 
+    # adjust for special distros
+    libdir  = os.path.basename(os.path.normpath(X_LIBDIR_X))  if X_LIBDIR_X  else "lib"
+    datadir = os.path.basename(os.path.normpath(X_DATADIR_X)) if X_DATADIR_X else "share"
+
     # standalone, installed system-wide linux
     if libPrefix is not None:
-        pathBinaries  = os.path.join(libPrefix, "lib", "carla")
-        pathResources = os.path.join(libPrefix, "share", "carla", "resources")
+        pathBinaries  = os.path.join(libPrefix, libdir, "carla")
+        pathResources = os.path.join(libPrefix, datadir, "carla", "resources")
 
     # standalone, local source
     elif CWDl.endswith("source"):
@@ -562,7 +633,7 @@ def getPaths(libPrefix = None):
     elif CWDl.endswith("resources"):
         # installed system-wide linux
         if CWDl.endswith("/share/carla/resources"):
-            pathBinaries  = os.path.abspath(os.path.join(CWD, "..", "..", "..", "lib", "carla"))
+            pathBinaries  = os.path.abspath(os.path.join(CWD, "..", "..", "..", libdir, "carla"))
             pathResources = CWD
 
         # local source
@@ -587,13 +658,14 @@ def getPaths(libPrefix = None):
 # TODO move to carla_host.py or something
 
 def signalHandler(sig, frame):
-    if gCarla.gui is None:
-        return
-
     if sig in (SIGINT, SIGTERM):
-        gCarla.gui.SIGTERM.emit()
+        gCarla.term = True
+        if gCarla.gui is not None:
+            gCarla.gui.SIGTERM.emit()
+
     elif haveSIGUSR1 and sig == SIGUSR1:
-        gCarla.gui.SIGUSR1.emit()
+        if gCarla.gui is not None:
+            gCarla.gui.SIGUSR1.emit()
 
 def setUpSignals():
     signal(SIGINT,  signalHandler)

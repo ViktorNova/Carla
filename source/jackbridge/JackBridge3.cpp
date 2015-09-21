@@ -1,6 +1,6 @@
 /*
  * JackBridge (Part 3, Export)
- * Copyright (C) 2013-2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2013-2015 Filipe Coelho <falktx@falktx.com>
  *
  * Permission to use, copy, modify, and/or distribute this software for any purpose with
  * or without fee is hereby granted, provided that the above copyright notice and this
@@ -29,13 +29,15 @@
 // -----------------------------------------------------------------------------
 
 JACKBRIDGE_EXPORT
-const JackBridgeExportedFunctions* jackbridge_get_exported_functions()
+const JackBridgeExportedFunctions* JACKBRIDGE_API jackbridge_get_exported_functions();
+
+JACKBRIDGE_EXPORT
+const JackBridgeExportedFunctions* JACKBRIDGE_API jackbridge_get_exported_functions()
 {
     static JackBridgeExportedFunctions funcs;
     carla_zeroStruct(funcs);
 
-    funcs.unique1 = funcs.unique2 = 0xdeadf00d;
-
+    funcs.init_ptr                             = jackbridge_init;
     funcs.get_version_ptr                      = jackbridge_get_version;
     funcs.get_version_string_ptr               = jackbridge_get_version_string;
     funcs.client_open_ptr                      = jackbridge_client_open;
@@ -79,7 +81,7 @@ const JackBridgeExportedFunctions* jackbridge_get_exported_functions()
     funcs.port_connected_to_ptr                = jackbridge_port_connected_to;
     funcs.port_get_connections_ptr             = jackbridge_port_get_connections;
     funcs.port_get_all_connections_ptr         = jackbridge_port_get_all_connections;
-    funcs.port_set_name_ptr                    = jackbridge_port_set_name;
+    funcs.port_rename_ptr                      = jackbridge_port_rename;
     funcs.port_set_alias_ptr                   = jackbridge_port_set_alias;
     funcs.port_unset_alias_ptr                 = jackbridge_port_unset_alias;
     funcs.port_get_aliases_ptr                 = jackbridge_port_get_aliases;
@@ -133,6 +135,8 @@ const JackBridgeExportedFunctions* jackbridge_get_exported_functions()
     funcs.shm_attach_ptr                       = jackbridge_shm_attach;
     funcs.shm_close_ptr                        = jackbridge_shm_close;
     funcs.shm_map_ptr                          = jackbridge_shm_map;
+
+    funcs.unique1 = funcs.unique2 = funcs.unique3 = 0xdeadf00d;
 
     return &funcs;
 }

@@ -1,6 +1,6 @@
 /*
  * DISTRHO 3BandEQ Plugin, based on 3BandEQ by Michael Gruhn
- * Copyright (C) 2012-2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2012-2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,19 +18,9 @@
 #define DISTRHO_UI_3BANDEQ_HPP_INCLUDED
 
 #include "DistrhoUI.hpp"
-
-#include "ImageAboutWindow.hpp"
-#include "ImageButton.hpp"
-#include "ImageKnob.hpp"
-#include "ImageSlider.hpp"
+#include "ImageWidgets.hpp"
 
 #include "DistrhoArtwork3BandEQ.hpp"
-
-using DGL::Image;
-using DGL::ImageAboutWindow;
-using DGL::ImageButton;
-using DGL::ImageKnob;
-using DGL::ImageSlider;
 
 START_NAMESPACE_DISTRHO
 
@@ -48,8 +38,8 @@ protected:
     // -------------------------------------------------------------------
     // DSP Callbacks
 
-    void d_parameterChanged(uint32_t index, float value) override;
-    void d_programChanged(uint32_t index) override;
+    void parameterChanged(uint32_t index, float value) override;
+    void programLoaded(uint32_t index) override;
 
     // -------------------------------------------------------------------
     // Widget Callbacks

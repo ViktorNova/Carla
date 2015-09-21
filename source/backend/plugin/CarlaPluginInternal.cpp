@@ -27,7 +27,6 @@ CARLA_BACKEND_START_NAMESPACE
 // Fallback data
 
 static const MidiProgramData kMidiProgramDataNull  = { 0, 0, nullptr };
-static const CustomData      kCustomDataFallback   = { nullptr, nullptr, nullptr };
 static /* */ CustomData      kCustomDataFallbackNC = { nullptr, nullptr, nullptr };
 
 // -----------------------------------------------------------------------
@@ -50,7 +49,7 @@ void PluginAudioData::createNew(const uint32_t newCount)
     CARLA_SAFE_ASSERT_RETURN(newCount > 0,);
 
     ports = new PluginAudioPort[newCount];
-    carla_zeroStruct(ports, newCount);
+    carla_zeroStructs(ports, newCount);
 
     count = newCount;
 }
@@ -104,7 +103,7 @@ void PluginCVData::createNew(const uint32_t newCount)
     CARLA_SAFE_ASSERT_RETURN(newCount > 0,);
 
     ports = new PluginCVPort[newCount];
-    carla_zeroStruct(ports, newCount);
+    carla_zeroStructs(ports, newCount);
 
     count = newCount;
 }
@@ -201,7 +200,7 @@ void PluginParameterData::createNew(const uint32_t newCount, const bool withSpec
     CARLA_SAFE_ASSERT_RETURN(newCount > 0,);
 
     data = new ParameterData[newCount];
-    carla_zeroStruct(data, newCount);
+    carla_zeroStructs(data, newCount);
 
     for (uint32_t i=0; i < newCount; ++i)
     {
@@ -211,12 +210,12 @@ void PluginParameterData::createNew(const uint32_t newCount, const bool withSpec
     }
 
     ranges = new ParameterRanges[newCount];
-    carla_zeroStruct(ranges, newCount);
+    carla_zeroStructs(ranges, newCount);
 
     if (withSpecial)
     {
         special = new SpecialParameterType[newCount];
-        carla_zeroStruct(special, newCount);
+        carla_zeroStructs(special, newCount);
     }
 
     count = newCount;
@@ -248,7 +247,23 @@ void PluginParameterData::clear() noexcept
 float PluginParameterData::getFixedValue(const uint32_t parameterId, const float& value) const noexcept
 {
     CARLA_SAFE_ASSERT_RETURN(parameterId < count, 0.0f);
-    return ranges[parameterId].getFixedValue(value);
+
+    const uint             paramHints (data[parameterId].hints);
+    const ParameterRanges& paramRanges(ranges[parameterId]);
+
+    // if boolean, return either min or max
+    if (paramHints & PARAMETER_IS_BOOLEAN)
+    {
+        const float middlePoint = paramRanges.min + (paramRanges.max-paramRanges.min)/2.0f;
+        return value >= middlePoint ? paramRanges.max : paramRanges.min;
+    }
+
+    // if integer, round first
+    if (paramHints & PARAMETER_IS_INTEGER)
+        return paramRanges.getFixedValue(std::round(value));
+
+    // normal mode
+    return paramRanges.getFixedValue(value);
 }
 
 // -----------------------------------------------------------------------
@@ -274,7 +289,7 @@ void PluginProgramData::createNew(const uint32_t newCount)
     CARLA_SAFE_ASSERT_RETURN(newCount > 0,);
 
     names = new ProgramName[newCount];
-    carla_zeroStruct(names, newCount);
+    carla_zeroStructs(names, newCount);
 
     count   = newCount;
     current = -1;
@@ -324,7 +339,7 @@ void PluginMidiProgramData::createNew(const uint32_t newCount)
     CARLA_SAFE_ASSERT_RETURN(newCount > 0,);
 
     data = new MidiProgramData[newCount];
-    carla_zeroStruct(data, newCount);
+    carla_zeroStructs(data, newCount);
 
     count   = newCount;
     current = -1;
@@ -561,11 +576,11 @@ CarlaPlugin::ProtectedData::ProtectedData(CarlaEngine* const eng, const uint idx
       extNotes(),
       latency(),
       postRtEvents(),
-      postUiEvents(),
+      postUiEvents()
 #ifndef BUILD_BRIDGE
-      postProc(),
+    , postProc()
 #endif
-      leakDetector_ProtectedData() {}
+      {}
 
 CarlaPlugin::ProtectedData::~ProtectedData() noexcept
 {
@@ -613,7 +628,7 @@ CarlaPlugin::ProtectedData::~ProtectedData() noexcept
         iconName = nullptr;
     }
 
-    for (LinkedList<CustomData>::Itenerator it = custom.begin(); it.valid(); it.next())
+    for (LinkedList<CustomData>::Itenerator it = custom.begin2(); it.valid(); it.next())
     {
         CustomData& customData(it.getValue(kCustomDataFallbackNC));
         //CARLA_SAFE_ASSERT_CONTINUE(customData.isValid());

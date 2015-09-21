@@ -31,7 +31,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "../globals.h"
+#include "globals.h"
 #include "Util.h"
 
 using namespace std;
@@ -97,8 +97,8 @@ const char *mxmlElementGetAttr(const mxml_node_t *node, const char *name)
 XMLwrapper::XMLwrapper()
 {
     version.Major    = 2;
-    version.Minor    = 4;
-    version.Revision = 4;
+    version.Minor    = 5;
+    version.Revision = 1;
 
     minimal = true;
 
@@ -187,13 +187,12 @@ bool XMLwrapper::hasPadSynth() const
 
 /* SAVE XML members */
 
-int XMLwrapper::saveXMLfile(const string &filename) const
+int XMLwrapper::saveXMLfile(const string &filename, int compression) const
 {
     char *xmldata = getXMLdata();
     if(xmldata == NULL)
         return -2;
 
-    int compression = config.cfg.GzipCompression;
     int result      = dosavefile(filename.c_str(), compression, xmldata);
 
     free(xmldata);
@@ -311,7 +310,7 @@ int XMLwrapper::loadXMLfile(const string &filename)
         mxmlDelete(tree);
     tree = NULL;
 
-    const char *xmldata = doloadfile(filename.c_str());
+    const char *xmldata = doloadfile(filename);
     if(xmldata == NULL)
         return -1;  //the file could not be loaded or uncompressed
 
@@ -618,6 +617,7 @@ mxml_node_t *XMLwrapper::addparams(const char *name, unsigned int params,
                      << ParamName << "=\"" << ParamValue << "\"" << endl;
             mxmlElementSetAttr(element, ParamName, ParamValue);
         }
+        va_end(variableList);
     }
     return element;
 }

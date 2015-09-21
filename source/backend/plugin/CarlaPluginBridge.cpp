@@ -1,6 +1,6 @@
 /*
  * Carla Plugin Bridge
- * Copyright (C) 2011-2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2011-2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -50,17 +50,17 @@ struct BridgeAudioPool {
     CarlaString filename;
     std::size_t size;
     float* data;
-    shm_t shm;
+    carla_shm_t shm;
 
     BridgeAudioPool() noexcept
         : filename(),
           size(0),
           data(nullptr)
 #ifdef CARLA_PROPER_CPP11_SUPPORT
-        , shm(shm_t_INIT) {}
+        , shm(carla_shm_t_INIT) {}
 #else
     {
-        shm = shm_t_INIT;
+        carla_shm_init(shm);
     }
 #endif
 
@@ -80,8 +80,7 @@ struct BridgeAudioPool {
 
         shm = carla_shm_create_temp(tmpFileBase);
 
-        if (! carla_is_shm_valid(shm))
-            return false;
+        CARLA_SAFE_ASSERT_RETURN(carla_is_shm_valid(shm), false);
 
         filename = tmpFileBase;
         return true;
@@ -132,17 +131,17 @@ struct BridgeRtClientControl : public CarlaRingBufferControl<SmallStackBuffer> {
     BridgeRtClientData* data;
     CarlaString filename;
     bool needsSemDestroy;
-    shm_t shm;
+    carla_shm_t shm;
 
     BridgeRtClientControl()
         : data(nullptr),
           filename(),
-          needsSemDestroy(false),
+          needsSemDestroy(false)
 #ifdef CARLA_PROPER_CPP11_SUPPORT
-          shm(shm_t_INIT) {}
+        , shm(carla_shm_t_INIT) {}
 #else
     {
-        shm = shm_t_INIT;
+        carla_shm_init(shm);
     }
 #endif
 
@@ -162,8 +161,7 @@ struct BridgeRtClientControl : public CarlaRingBufferControl<SmallStackBuffer> {
 
         shm = carla_shm_create_temp(tmpFileBase);
 
-        if (! carla_is_shm_valid(shm))
-            return false;
+        CARLA_SAFE_ASSERT_RETURN(carla_is_shm_valid(shm), false);
 
         if (! mapData())
         {
@@ -243,13 +241,13 @@ struct BridgeRtClientControl : public CarlaRingBufferControl<SmallStackBuffer> {
         setRingBuffer(nullptr, false);
     }
 
-    bool waitForClient(const uint secs, bool* const timedOut) noexcept
+    bool waitForClient(const uint secs) noexcept
     {
         CARLA_SAFE_ASSERT_RETURN(data != nullptr, false);
 
         jackbridge_sem_post(&data->sem.server);
 
-        return jackbridge_sem_timedwait(&data->sem.client, secs, timedOut);
+        return jackbridge_sem_timedwait(&data->sem.client, secs);
     }
 
     void writeOpcode(const PluginBridgeRtClientOpcode opcode) noexcept
@@ -266,17 +264,17 @@ struct BridgeNonRtClientControl : public CarlaRingBufferControl<BigStackBuffer> 
     BridgeNonRtClientData* data;
     CarlaString filename;
     CarlaMutex mutex;
-    shm_t shm;
+    carla_shm_t shm;
 
     BridgeNonRtClientControl() noexcept
         : data(nullptr),
           filename(),
           mutex()
 #ifdef CARLA_PROPER_CPP11_SUPPORT
-        , shm(shm_t_INIT) {}
+        , shm(carla_shm_t_INIT) {}
 #else
     {
-        shm = shm_t_INIT;
+        carla_shm_init(shm);
     }
 #endif
 
@@ -296,8 +294,7 @@ struct BridgeNonRtClientControl : public CarlaRingBufferControl<BigStackBuffer> 
 
         shm = carla_shm_create_temp(tmpFileBase);
 
-        if (! carla_is_shm_valid(shm))
-            return false;
+        CARLA_SAFE_ASSERT_RETURN(carla_is_shm_valid(shm), false);
 
         if (! mapData())
         {
@@ -382,16 +379,16 @@ struct BridgeNonRtClientControl : public CarlaRingBufferControl<BigStackBuffer> 
 struct BridgeNonRtServerControl : public CarlaRingBufferControl<HugeStackBuffer> {
     BridgeNonRtServerData* data;
     CarlaString filename;
-    shm_t shm;
+    carla_shm_t shm;
 
     BridgeNonRtServerControl() noexcept
         : data(nullptr),
           filename()
 #ifdef CARLA_PROPER_CPP11_SUPPORT
-        , shm(shm_t_INIT) {}
+        , shm(carla_shm_t_INIT) {}
 #else
     {
-        shm = shm_t_INIT;
+        carla_shm_init(shm);
     }
 #endif
 
@@ -501,8 +498,7 @@ public:
           fBinary(),
           fLabel(),
           fShmIds(),
-          fProcess(),
-          leakDetector_CarlaPluginBridgeThread() {}
+          fProcess() {}
 
     void setData(const char* const binary, const char* const label, const char* const shmIds) noexcept
     {
@@ -621,11 +617,6 @@ protected:
                 carla_setenv("ENGINE_OPTION_PLUGIN_PATH_VST3", options.pathVST3);
             else
                 carla_setenv("ENGINE_OPTION_PLUGIN_PATH_VST3", "");
-
-            if (options.pathAU != nullptr)
-                carla_setenv("ENGINE_OPTION_PLUGIN_PATH_AU", options.pathAU);
-            else
-                carla_setenv("ENGINE_OPTION_PLUGIN_PATH_AU", "");
 
             if (options.pathGIG != nullptr)
                 carla_setenv("ENGINE_OPTION_PLUGIN_PATH_GIG", options.pathGIG);
@@ -751,8 +742,8 @@ public:
           fShmNonRtClientControl(),
           fShmNonRtServerControl(),
           fInfo(),
-          fParams(nullptr),
-          leakDetector_CarlaPluginBridge()
+          fUniqueId(0),
+          fParams(nullptr)
     {
         carla_debug("CarlaPluginBridge::CarlaPluginBridge(%p, %i, %s, %s)", engine, id, BinaryType2Str(btype), PluginType2Str(ptype));
 
@@ -823,7 +814,7 @@ public:
 
     int64_t getUniqueId() const noexcept override
     {
-        return fInfo.uniqueId;
+        return fUniqueId;
     }
 
     // -------------------------------------------------------------------
@@ -935,13 +926,16 @@ public:
 
         // TODO: only wait 1 minute for NI plugins
         const uint32_t timeoutEnd(Time::getMillisecondCounter() + 60*1000); // 60 secs, 1 minute
+        const bool needsEngineIdle(pData->engine->getType() != kEngineTypePlugin);
 
         carla_stdout("CarlaPluginBridge::waitForSaved() - now waiting...");
 
         for (; Time::getMillisecondCounter() < timeoutEnd && fBridgeThread.isThreadRunning();)
         {
             pData->engine->callback(ENGINE_CALLBACK_IDLE, 0, 0, 0, 0.0f, nullptr);
-            pData->engine->idle();
+
+            if (needsEngineIdle)
+                pData->engine->idle();
 
             if (fSaved)
                 break;
@@ -1084,6 +1078,9 @@ public:
         CARLA_SAFE_ASSERT_RETURN(type != nullptr && type[0] != '\0',);
         CARLA_SAFE_ASSERT_RETURN(key != nullptr && key[0] != '\0',);
         CARLA_SAFE_ASSERT_RETURN(value != nullptr,);
+
+        if (std::strcmp(type, CUSTOM_DATA_TYPE_PROPERTY) == 0)
+            return CarlaPlugin::setCustomData(type, key, value, sendGui);
 
         if (std::strcmp(type, CUSTOM_DATA_TYPE_STRING) == 0 && std::strcmp(key, "__CarlaPingOnOff__") == 0)
         {
@@ -1280,7 +1277,7 @@ public:
 
             portName.truncate(portNameSize);
 
-            pData->audioIn.ports[j].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, true);
+            pData->audioIn.ports[j].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, true, j);
             pData->audioIn.ports[j].rindex = j;
         }
 
@@ -1305,7 +1302,7 @@ public:
 
             portName.truncate(portNameSize);
 
-            pData->audioOut.ports[j].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false);
+            pData->audioOut.ports[j].port   = (CarlaEngineAudioPort*)pData->client->addPort(kEnginePortTypeAudio, portName, false, j);
             pData->audioOut.ports[j].rindex = j;
         }
 
@@ -1324,7 +1321,7 @@ public:
             portName += "event-in";
             portName.truncate(portNameSize);
 
-            pData->event.portIn = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, true);
+            pData->event.portIn = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, true, 0);
         }
 
         if (needsCtrlOut)
@@ -1340,7 +1337,7 @@ public:
             portName += "event-out";
             portName.truncate(portNameSize);
 
-            pData->event.portOut = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, false);
+            pData->event.portOut = (CarlaEngineEventPort*)pData->client->addPort(kEnginePortTypeEvent, portName, false, 0);
         }
 
         // extra plugin hints
@@ -1435,7 +1432,7 @@ public:
 
             if (pData->extNotes.mutex.tryLock())
             {
-                for (RtLinkedList<ExternalMidiNote>::Itenerator it = pData->extNotes.data.begin(); it.valid(); it.next())
+                for (RtLinkedList<ExternalMidiNote>::Itenerator it = pData->extNotes.data.begin2(); it.valid(); it.next())
                 {
                     const ExternalMidiNote& note(it.getValue());
 
@@ -1795,9 +1792,9 @@ public:
         // Post-processing (dry/wet, volume and balance)
 
         {
-            const bool doVolume  = (pData->hints & PLUGIN_CAN_VOLUME) != 0 && ! carla_compareFloats(pData->postProc.volume, 1.0f);
-            const bool doDryWet  = (pData->hints & PLUGIN_CAN_DRYWET) != 0 && ! carla_compareFloats(pData->postProc.dryWet, 1.0f);
-            const bool doBalance = (pData->hints & PLUGIN_CAN_BALANCE) != 0 && ! (carla_compareFloats(pData->postProc.balanceLeft, -1.0f) && carla_compareFloats(pData->postProc.balanceRight, 1.0f));
+            const bool doVolume  = (pData->hints & PLUGIN_CAN_VOLUME) != 0 && carla_isNotEqual(pData->postProc.volume, 1.0f);
+            const bool doDryWet  = (pData->hints & PLUGIN_CAN_DRYWET) != 0 && carla_isNotEqual(pData->postProc.dryWet, 1.0f);
+            const bool doBalance = (pData->hints & PLUGIN_CAN_BALANCE) != 0 && ! (carla_isEqual(pData->postProc.balanceLeft, -1.0f) && carla_isEqual(pData->postProc.balanceRight, 1.0f));
 
             bool isPair;
             float bufValue, oldBufLeft[doBalance ? frames : 1];
@@ -2008,11 +2005,12 @@ public:
                 const uint32_t optionEn = fShmNonRtServerControl.readUInt();
                 const  int64_t uniqueId = fShmNonRtServerControl.readLong();
 
+                CARLA_SAFE_ASSERT_INT2(fUniqueId == uniqueId, fUniqueId, uniqueId);
+
                 pData->hints   = hints | PLUGIN_IS_BRIDGE;
                 pData->options = optionEn;
 
                 fInfo.category = static_cast<PluginCategory>(category);
-                fInfo.uniqueId = uniqueId;
                 fInfo.optionsAvailable = optionAv;
             }   break;
 
@@ -2022,25 +2020,25 @@ public:
                 // realName
                 const uint32_t realNameSize(fShmNonRtServerControl.readUInt());
                 char realName[realNameSize+1];
-                carla_zeroChar(realName, realNameSize+1);
+                carla_zeroChars(realName, realNameSize+1);
                 fShmNonRtServerControl.readCustomData(realName, realNameSize);
 
                 // label
                 const uint32_t labelSize(fShmNonRtServerControl.readUInt());
                 char label[labelSize+1];
-                carla_zeroChar(label, labelSize+1);
+                carla_zeroChars(label, labelSize+1);
                 fShmNonRtServerControl.readCustomData(label, labelSize);
 
                 // maker
                 const uint32_t makerSize(fShmNonRtServerControl.readUInt());
                 char maker[makerSize+1];
-                carla_zeroChar(maker, makerSize+1);
+                carla_zeroChars(maker, makerSize+1);
                 fShmNonRtServerControl.readCustomData(maker, makerSize);
 
                 // copyright
                 const uint32_t copyrightSize(fShmNonRtServerControl.readUInt());
                 char copyright[copyrightSize+1];
-                carla_zeroChar(copyright, copyrightSize+1);
+                carla_zeroChars(copyright, copyrightSize+1);
                 fShmNonRtServerControl.readCustomData(copyright, copyrightSize);
 
                 fInfo.name  = realName;
@@ -2141,19 +2139,19 @@ public:
                 // name
                 const uint32_t nameSize(fShmNonRtServerControl.readUInt());
                 char name[nameSize+1];
-                carla_zeroChar(name, nameSize+1);
+                carla_zeroChars(name, nameSize+1);
                 fShmNonRtServerControl.readCustomData(name, nameSize);
 
                 // symbol
                 const uint32_t symbolSize(fShmNonRtServerControl.readUInt());
                 char symbol[symbolSize+1];
-                carla_zeroChar(symbol, symbolSize+1);
+                carla_zeroChars(symbol, symbolSize+1);
                 fShmNonRtServerControl.readCustomData(symbol, symbolSize);
 
                 // unit
                 const uint32_t unitSize(fShmNonRtServerControl.readUInt());
                 char unit[unitSize+1];
-                carla_zeroChar(unit, unitSize+1);
+                carla_zeroChars(unit, unitSize+1);
                 fShmNonRtServerControl.readCustomData(unit, unitSize);
 
                 CARLA_SAFE_ASSERT_INT2(index < pData->param.count, index, pData->param.count);
@@ -2254,7 +2252,7 @@ public:
                 // name
                 const uint32_t nameSize(fShmNonRtServerControl.readUInt());
                 char name[nameSize+1];
-                carla_zeroChar(name, nameSize+1);
+                carla_zeroChars(name, nameSize+1);
                 fShmNonRtServerControl.readCustomData(name, nameSize);
 
                 CARLA_SAFE_ASSERT_INT2(index < pData->prog.count, index, pData->prog.count);
@@ -2276,7 +2274,7 @@ public:
                 // name
                 const uint32_t nameSize(fShmNonRtServerControl.readUInt());
                 char name[nameSize+1];
-                carla_zeroChar(name, nameSize+1);
+                carla_zeroChars(name, nameSize+1);
                 fShmNonRtServerControl.readCustomData(name, nameSize);
 
                 CARLA_SAFE_ASSERT_INT2(index < pData->midiprog.count, index, pData->midiprog.count);
@@ -2297,19 +2295,19 @@ public:
                 // type
                 const uint32_t typeSize(fShmNonRtServerControl.readUInt());
                 char type[typeSize+1];
-                carla_zeroChar(type, typeSize+1);
+                carla_zeroChars(type, typeSize+1);
                 fShmNonRtServerControl.readCustomData(type, typeSize);
 
                 // key
                 const uint32_t keySize(fShmNonRtServerControl.readUInt());
                 char key[keySize+1];
-                carla_zeroChar(key, keySize+1);
+                carla_zeroChars(key, keySize+1);
                 fShmNonRtServerControl.readCustomData(key, keySize);
 
                 // value
                 const uint32_t valueSize(fShmNonRtServerControl.readUInt());
                 char value[valueSize+1];
-                carla_zeroChar(value, valueSize+1);
+                carla_zeroChars(value, valueSize+1);
                 fShmNonRtServerControl.readCustomData(value, valueSize);
 
                 CarlaPlugin::setCustomData(type, key, value, false);
@@ -2321,7 +2319,7 @@ public:
                 // chunkFilePath
                 const uint32_t chunkFilePathSize(fShmNonRtServerControl.readUInt());
                 char chunkFilePath[chunkFilePathSize+1];
-                carla_zeroChar(chunkFilePath, chunkFilePathSize+1);
+                carla_zeroChars(chunkFilePath, chunkFilePathSize+1);
                 fShmNonRtServerControl.readCustomData(chunkFilePath, chunkFilePathSize);
 
                 String realChunkFilePath(chunkFilePath);
@@ -2382,7 +2380,7 @@ public:
                 // error
                 const uint32_t errorSize(fShmNonRtServerControl.readUInt());
                 char error[errorSize+1];
-                carla_zeroChar(error, errorSize+1);
+                carla_zeroChars(error, errorSize+1);
                 fShmNonRtServerControl.readCustomData(error, errorSize);
 
                 if (fInitiated)
@@ -2418,7 +2416,7 @@ public:
 
     // -------------------------------------------------------------------
 
-    bool init(const char* const filename, const char* const name, const char* const label, const char* const bridgeBinary)
+    bool init(const char* const filename, const char* const name, const char* const label, const int64_t uniqueId, const char* const bridgeBinary)
     {
         CARLA_SAFE_ASSERT_RETURN(pData->engine != nullptr, false);
 
@@ -2448,6 +2446,7 @@ public:
         else
             pData->filename = carla_strdup("");
 
+        fUniqueId     = uniqueId;
         fBridgeBinary = bridgeBinary;
 
         std::srand(static_cast<uint>(std::time(nullptr)));
@@ -2509,7 +2508,7 @@ public:
         // init bridge thread
         {
             char shmIdsStr[6*4+1];
-            carla_zeroChar(shmIdsStr, 6*4+1);
+            carla_zeroChars(shmIdsStr, 6*4+1);
 
             std::strncpy(shmIdsStr+6*0, &fShmAudioPool.filename[fShmAudioPool.filename.length()-6], 6);
             std::strncpy(shmIdsStr+6*1, &fShmRtClientControl.filename[fShmRtClientControl.filename.length()-6], 6);
@@ -2536,10 +2535,15 @@ public:
 #endif
         sFirstInit = false;
 
+        const bool needsEngineIdle = pData->engine->getType() != kEngineTypePlugin;
+
         for (; Time::currentTimeMillis() < fLastPongTime + timeoutEnd && fBridgeThread.isThreadRunning();)
         {
             pData->engine->callback(ENGINE_CALLBACK_IDLE, 0, 0, 0, 0.0f, nullptr);
-            pData->engine->idle();
+
+            if (needsEngineIdle)
+                pData->engine->idle();
+
             idle();
 
             if (fInitiated)
@@ -2608,7 +2612,6 @@ private:
         uint32_t mIns, mOuts;
         PluginCategory category;
         uint optionsAvailable;
-        int64_t uniqueId;
         CarlaString name;
         CarlaString label;
         CarlaString maker;
@@ -2624,13 +2627,14 @@ private:
               mOuts(0),
               category(PLUGIN_CATEGORY_NONE),
               optionsAvailable(0),
-              uniqueId(0),
               name(),
               label(),
               maker(),
               copyright(),
               chunk() {}
     } fInfo;
+
+    int64_t fUniqueId;
 
     BridgeParamInfo* fParams;
 
@@ -2651,18 +2655,11 @@ private:
         CARLA_SAFE_ASSERT_RETURN(! fTimedOut,);
         CARLA_SAFE_ASSERT_RETURN(! fTimedError,);
 
-        if (fShmRtClientControl.waitForClient(secs, &fTimedOut))
+        if (fShmRtClientControl.waitForClient(secs))
             return;
 
-        if (fTimedOut)
-        {
-            carla_stderr("waitForClient(%s) timeout here", action);
-        }
-        else
-        {
-            fTimedError = true;
-            carla_stderr("waitForClient(%s) error while waiting", action);
-        }
+        fTimedOut = true;
+        carla_stderr("waitForClient(%s) timeout here", action);
     }
 
     CARLA_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CarlaPluginBridge)
@@ -2686,36 +2683,7 @@ CarlaPlugin* CarlaPlugin::newBridge(const Initializer& init, BinaryType btype, P
 
     CarlaPluginBridge* const plugin(new CarlaPluginBridge(init.engine, init.id, btype, ptype));
 
-    if (! plugin->init(init.filename, init.name, init.label, bridgeBinary))
-    {
-        delete plugin;
-        return nullptr;
-    }
-
-    plugin->reload();
-
-    bool canRun = true;
-
-    if (init.engine->getProccessMode() == ENGINE_PROCESS_MODE_CONTINUOUS_RACK)
-    {
-        if (! plugin->canRunInRack())
-        {
-            init.engine->setLastError("Carla's rack mode can only work with Stereo Bridged plugins, sorry!");
-            canRun = false;
-        }
-        else if (plugin->getCVInCount() > 0 || plugin->getCVInCount() > 0)
-        {
-            init.engine->setLastError("Carla's rack mode cannot work with plugins that have CV ports, sorry!");
-            canRun = false;
-        }
-    }
-    else if (init.engine->getProccessMode() == ENGINE_PROCESS_MODE_PATCHBAY && (plugin->getCVInCount() > 0 || plugin->getCVInCount() > 0))
-    {
-        init.engine->setLastError("CV ports in patchbay mode is still TODO");
-        canRun = false;
-    }
-
-    if (! canRun)
+    if (! plugin->init(init.filename, init.name, init.label, init.uniqueId, bridgeBinary))
     {
         delete plugin;
         return nullptr;

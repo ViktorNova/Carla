@@ -92,7 +92,7 @@
 #define NS_rdf  "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 #define NS_rdfs "http://www.w3.org/2000/01/rdf-schema#"
 #define NS_llmm "http://ll-plugins.nongnu.org/lv2/ext/midimap#"
-#define NS_mod  "http://portalmod.com/ns/modgui#"
+#define NS_mod  "http://moddevices.com/ns/modgui#"
 
 #define LV2_MIDI_Map__CC      "http://ll-plugins.nongnu.org/lv2/namespace#CC"
 #define LV2_MIDI_Map__NRPN    "http://ll-plugins.nongnu.org/lv2/namespace#NRPN"
@@ -374,7 +374,7 @@ public:
 
     void initIfNeeded(const char* const LV2_PATH)
     {
-        CARLA_SAFE_ASSERT_RETURN(LV2_PATH != nullptr && LV2_PATH[0] != '\0',);
+        CARLA_SAFE_ASSERT_RETURN(LV2_PATH != nullptr,);
 
         if (! needsInit)
             return;
@@ -570,10 +570,10 @@ const LV2_RDF_Descriptor* lv2_rdf_new(const LV2_URI uri, const bool loadPresets)
             rdfDescriptor->Author = carla_strdup(author);
 
         if (const char* const binary = lilvPlugin.get_library_uri().as_string())
-            rdfDescriptor->Binary = carla_strdup(lilv_uri_to_path(binary));
+            rdfDescriptor->Binary = carla_strdup_free(lilv_file_uri_parse(binary, nullptr));
 
         if (const char* const bundle = lilvPlugin.get_bundle_uri().as_string())
-            rdfDescriptor->Bundle = carla_strdup(lilv_uri_to_path(bundle));
+            rdfDescriptor->Bundle = carla_strdup_free(lilv_file_uri_parse(bundle, nullptr));
 
         Lilv::Nodes licenseNodes(lilvPlugin.get_value(lv2World.doap_license));
 
@@ -1018,39 +1018,38 @@ const LV2_RDF_Descriptor* lv2_rdf_new(const LV2_URI uri, const bool loadPresets)
                                 carla_stderr("lv2_rdf_new(\"%s\") - got unknown unit unit '%s'", uri, unitUnit);
                         }
                     }
+
+                    if (LilvNode* const unitNameNode = lilv_world_get(lv2World.me, unitUnitNode, lv2World.unit_name.me, nullptr))
+                    {
+                        if (const char* const unitName = lilv_node_as_string(unitNameNode))
+                        {
+                            rdfPort->Unit.Hints |= LV2_PORT_UNIT_NAME;
+                            rdfPort->Unit.Name   = carla_strdup(unitName);
+                        }
+                        lilv_node_free(unitNameNode);
+                    }
+
+                    if (LilvNode* const unitRenderNode = lilv_world_get(lv2World.me, unitUnitNode, lv2World.unit_render.me, nullptr))
+                    {
+                        if (const char* const unitRender = lilv_node_as_string(unitRenderNode))
+                        {
+                            rdfPort->Unit.Hints |= LV2_PORT_UNIT_RENDER;
+                            rdfPort->Unit.Render = carla_strdup(unitRender);
+                        }
+                        lilv_node_free(unitRenderNode);
+                    }
+
+                    if (LilvNode* const unitSymbolNode = lilv_world_get(lv2World.me, unitUnitNode, lv2World.unit_symbol.me, nullptr))
+                    {
+                        if (const char* const unitSymbol = lilv_node_as_string(unitSymbolNode))
+                        {
+                            rdfPort->Unit.Hints |= LV2_PORT_UNIT_SYMBOL;
+                            rdfPort->Unit.Symbol = carla_strdup(unitSymbol);
+                        }
+                        lilv_node_free(unitSymbolNode);
+                    }
+
                     lilv_node_free(unitUnitNode);
-                }
-
-                // FIXME
-
-                if (LilvNode* const unitNameNode = lilv_port_get(lilvPort.parent, lilvPort.me, lv2World.unit_name.me))
-                {
-                    if (const char* const unitName = lilv_node_as_string(unitNameNode))
-                    {
-                        rdfPort->Unit.Hints |= LV2_PORT_UNIT_NAME;
-                        rdfPort->Unit.Name   = carla_strdup(unitName);
-                    }
-                    lilv_node_free(unitNameNode);
-                }
-
-                if (LilvNode* const unitRenderNode = lilv_port_get(lilvPort.parent, lilvPort.me, lv2World.unit_render.me))
-                {
-                    if (const char* const unitRender = lilv_node_as_string(unitRenderNode))
-                    {
-                        rdfPort->Unit.Hints |= LV2_PORT_UNIT_RENDER;
-                        rdfPort->Unit.Render = carla_strdup(unitRender);
-                    }
-                    lilv_node_free(unitRenderNode);
-                }
-
-                if (LilvNode* const unitSymbolNode = lilv_port_get(lilvPort.parent, lilvPort.me, lv2World.unit_symbol.me))
-                {
-                    if (const char* const unitSymbol = lilv_node_as_string(unitSymbolNode))
-                    {
-                        rdfPort->Unit.Hints |= LV2_PORT_UNIT_SYMBOL;
-                        rdfPort->Unit.Symbol = carla_strdup(unitSymbol);
-                    }
-                    lilv_node_free(unitSymbolNode);
                 }
             }
 
@@ -1211,7 +1210,7 @@ const LV2_RDF_Descriptor* lv2_rdf_new(const LV2_URI uri, const bool loadPresets)
                 Lilv::Node lilvFeatureNode(lilvFeatureNodes.get(it));
                 LV2_RDF_Feature* const rdfFeature(&rdfDescriptor->Features[h++]);
 
-                rdfFeature->Type = lilvFeatureNodesR.contains(lilvFeatureNode) ? LV2_FEATURE_REQUIRED : LV2_FEATURE_OPTIONAL;
+                rdfFeature->Required = lilvFeatureNodesR.contains(lilvFeatureNode);
 
                 if (const char* const featureURI = lilvFeatureNode.as_uri())
                     rdfFeature->URI = carla_strdup(featureURI);
@@ -1314,10 +1313,10 @@ const LV2_RDF_Descriptor* lv2_rdf_new(const LV2_URI uri, const bool loadPresets)
                         rdfUI->URI = carla_strdup(uiURI);
 
                     if (const char* const uiBinary = lilvUI.get_binary_uri().as_string())
-                        rdfUI->Binary = carla_strdup(lilv_uri_to_path(uiBinary));
+                        rdfUI->Binary = carla_strdup_free(lilv_file_uri_parse(uiBinary, nullptr));
 
                     if (const char* const uiBundle = lilvUI.get_bundle_uri().as_string())
-                        rdfUI->Bundle = carla_strdup(lilv_uri_to_path(uiBundle));
+                        rdfUI->Bundle = carla_strdup_free(lilv_file_uri_parse(uiBundle, nullptr));
                 }
 
                 // -------------------------------------------------------
@@ -1340,7 +1339,7 @@ const LV2_RDF_Descriptor* lv2_rdf_new(const LV2_URI uri, const bool loadPresets)
                             Lilv::Node lilvFeatureNode(lilvFeatureNodes.get(it2));
                             LV2_RDF_Feature* const rdfFeature(&rdfUI->Features[h2++]);
 
-                            rdfFeature->Type = lilvFeatureNodesR.contains(lilvFeatureNode) ? LV2_FEATURE_REQUIRED : LV2_FEATURE_OPTIONAL;
+                            rdfFeature->Required = lilvFeatureNodesR.contains(lilvFeatureNode);
 
                             if (const char* const featureURI = lilvFeatureNode.as_uri())
                                 rdfFeature->URI = carla_strdup(featureURI);
@@ -1406,7 +1405,7 @@ const LV2_RDF_Descriptor* lv2_rdf_new(const LV2_URI uri, const bool loadPresets)
                 // Set UI Information
 
                 if (const char* const resDir = lilvPlugin.get_modgui_resources_directory().as_uri())
-                    rdfUI->URI = carla_strdup(lilv_uri_to_path(resDir));
+                    rdfUI->URI = carla_strdup_free(lilv_file_uri_parse(resDir, nullptr));
 
                 if (rdfDescriptor->Bundle != nullptr)
                     rdfUI->Bundle = carla_strdup(rdfDescriptor->Bundle);

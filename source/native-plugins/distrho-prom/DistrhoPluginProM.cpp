@@ -1,6 +1,6 @@
 /*
  * DISTRHO ProM Plugin
- * Copyright (C) 2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -36,26 +36,26 @@ DistrhoPluginProM::~DistrhoPluginProM()
 // -----------------------------------------------------------------------
 // Init
 
-void DistrhoPluginProM::d_initParameter(uint32_t, Parameter&)
+void DistrhoPluginProM::initParameter(uint32_t, Parameter&)
 {
 }
 
 // -----------------------------------------------------------------------
 // Internal data
 
-float DistrhoPluginProM::d_getParameterValue(uint32_t) const
+float DistrhoPluginProM::getParameterValue(uint32_t) const
 {
     return 0.0f;
 }
 
-void DistrhoPluginProM::d_setParameterValue(uint32_t, float)
+void DistrhoPluginProM::setParameterValue(uint32_t, float)
 {
 }
 
 // -----------------------------------------------------------------------
 // Process
 
-void DistrhoPluginProM::d_run(const float** inputs, float** outputs, uint32_t frames)
+void DistrhoPluginProM::run(const float** inputs, float** outputs, uint32_t frames)
 {
     const float* in  = inputs[0];
     float*       out = outputs[0];

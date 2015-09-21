@@ -1,7 +1,7 @@
 /*
  * DISTRHO MVerb, a DPF'ied MVerb.
  * Copyright (c) 2010 Martin Eastwood
- * Copyright (C) 2014 Filipe Coelho <falktx@falktx.com>
+ * Copyright (C) 2015 Filipe Coelho <falktx@falktx.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -20,9 +20,8 @@
 #define DISTRHO_UI_MVERB_HPP_INCLUDED
 
 #include "DistrhoUI.hpp"
-
-#include "ImageKnob.hpp"
 #include "NanoVG.hpp"
+#include "ImageWidgets.hpp"
 
 #include "DistrhoArtworkMVerb.hpp"
 
@@ -47,8 +46,8 @@ protected:
     // -------------------------------------------------------------------
     // DSP Callbacks
 
-    void d_parameterChanged(uint32_t index, float value) override;
-    void d_programChanged(uint32_t index) override;
+    void parameterChanged(uint32_t index, float value) override;
+    void programLoaded(uint32_t index) override;
 
     // -------------------------------------------------------------------
     // Widget Callbacks

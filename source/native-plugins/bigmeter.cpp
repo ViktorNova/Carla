@@ -21,6 +21,7 @@
 #include "CarlaNativeExtUI.hpp"
 
 #include "juce_audio_basics.h"
+using juce::roundToIntAccurate;
 using juce::FloatVectorOperations;
 using juce::Range;
 
@@ -30,12 +31,11 @@ class BigMeterPlugin : public NativePluginAndUiClass
 {
 public:
     BigMeterPlugin(const NativeHostDescriptor* const host)
-        : NativePluginAndUiClass(host, CARLA_OS_SEP_STR "bigmeter-ui"),
+        : NativePluginAndUiClass(host, "bigmeter-ui"),
           fColor(1),
           fStyle(1),
           fOutLeft(0.0f),
-          fOutRight(0.0f),
-          leakDetector_BigMeterPlugin() {}
+          fOutRight(0.0f) {}
 
 protected:
     // -------------------------------------------------------------------
@@ -136,10 +136,10 @@ protected:
         switch (index)
         {
         case 0:
-            fColor = int(value);
+            fColor = roundToIntAccurate(value);
             break;
         case 1:
-            fStyle = int(value);
+            fStyle = roundToIntAccurate(value);
             break;
         default:
             break;
@@ -181,12 +181,12 @@ static const NativePluginDescriptor bigmeterDesc = {
     /* hints     */ static_cast<NativePluginHints>(NATIVE_PLUGIN_IS_RTSAFE
                                                   |NATIVE_PLUGIN_HAS_UI
                                                   |NATIVE_PLUGIN_NEEDS_FIXED_BUFFERS),
-    /* supports  */ static_cast<NativePluginSupports>(0x0),
+    /* supports  */ NATIVE_PLUGIN_SUPPORTS_NOTHING,
     /* audioIns  */ 2,
     /* audioOuts */ 0,
     /* midiIns   */ 0,
     /* midiOuts  */ 0,
-    /* paramIns  */ 1,
+    /* paramIns  */ 2,
     /* paramOuts */ 2,
     /* name      */ "Big Meter",
     /* label     */ "bigmeter",

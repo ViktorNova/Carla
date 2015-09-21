@@ -25,6 +25,11 @@
 # include <signal.h>
 #endif
 
+#ifdef CARLA_OS_LINUX
+# include <X11/Xlib.h>
+#endif
+
+#include "jackbridge/JackBridge.hpp"
 #include "juce_core.h"
 
 #if defined(CARLA_OS_MAC) || defined(CARLA_OS_WIN)
@@ -172,8 +177,7 @@ public:
     CarlaBridgePlugin(const bool useBridge, const char* const clientName, const char* const audioPoolBaseName,
                       const char* const rtClientBaseName, const char* const nonRtClientBaseName, const char* const nonRtServerBaseName)
         : fEngine(nullptr),
-          fUsingBridge(false),
-          leakDetector_CarlaBridgePlugin()
+          fUsingBridge(false)
     {
         CARLA_ASSERT(clientName != nullptr && clientName[0] != '\0');
         carla_debug("CarlaBridgePlugin::CarlaBridgePlugin(%s, \"%s\", %s, %s, %s, %s)", bool2str(useBridge), clientName, audioPoolBaseName, rtClientBaseName, nonRtClientBaseName, nonRtServerBaseName);
@@ -295,6 +299,17 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+#if defined(CARLA_OS_WIN) && ! defined(BUILDING_CARLA_FOR_WINDOWS)
+    // ---------------------------------------------------------------------
+    // Test if bridge is working
+
+    if (! jackbridge_is_ok())
+    {
+        carla_stderr("A JACK or Wine library is missing, cannot continue");
+        return 1;
+    }
+#endif
+
     // ---------------------------------------------------------------------
     // Get args
 
@@ -375,18 +390,79 @@ int main(int argc, char* argv[])
         rtClientBaseName[0]    = '\0';
         nonRtClientBaseName[0] = '\0';
         nonRtServerBaseName[0] = '\0';
+        jackbridge_init();
     }
 
     // ---------------------------------------------------------------------
     // Set client name
 
-    CarlaString clientName(name != nullptr ? name : label);
+    CarlaString clientName;
 
-    if (clientName.isEmpty())
+    if (name != nullptr)
+    {
+        clientName = name;
+    }
+    else if (itype == CarlaBackend::PLUGIN_LV2)
+    {
+        // LV2 requires URI
+        CARLA_SAFE_ASSERT_RETURN(label != nullptr && label[0] != '\0', 1);
+
+        // LV2 URI is not usable as client name, create a usable name from URI
+        CarlaString label2(label);
+
+        // truncate until last valid char
+        for (std::size_t i=label2.length()-1; i != 0; --i)
+        {
+            if (! std::isalnum(label2[i]))
+                continue;
+
+            label2.truncate(i+1);
+            break;
+        }
+
+        // get last used separator
+        bool found;
+        std::size_t septmp, sep = 0;
+
+        septmp = label2.rfind('#', &found)+1;
+        if (found && septmp > sep)
+            sep = septmp;
+
+        septmp = label2.rfind('/', &found)+1;
+        if (found && septmp > sep)
+            sep = septmp;
+
+        septmp = label2.rfind('=', &found)+1;
+        if (found && septmp > sep)
+            sep = septmp;
+
+        septmp = label2.rfind(':', &found)+1;
+        if (found && septmp > sep)
+            sep = septmp;
+
+        // make name starting from the separator and first valid char
+        const char* name2 = label2.buffer() + sep;
+        for (; *name2 != '\0' && ! std::isalnum(*name2); ++name2) {}
+
+        if (*name2 != '\0')
+            clientName = name2;
+    }
+    else if (label != nullptr)
+    {
+        clientName = label;
+    }
+    else
     {
         const String jfilename = String(CharPointer_UTF8(filename));
         clientName = File(jfilename).getFileNameWithoutExtension().toRawUTF8();
     }
+
+    // if we still have no client name by now, use a dummy one
+    if (clientName.isEmpty())
+        clientName = "carla-plugin";
+
+    // just to be safe
+    clientName.toBasic();
 
     // ---------------------------------------------------------------------
     // Set extraStuff
@@ -401,6 +477,11 @@ int main(int argc, char* argv[])
         if (std::strstr(label, " (16 outs)") != nullptr)
             extraStuff = "true";
     }
+
+#ifdef CARLA_OS_LINUX
+    if (std::getenv("DISPLAY") != nullptr)
+        XInitThreads();
+#endif
 
     // ---------------------------------------------------------------------
     // Init plugin bridge
@@ -434,7 +515,12 @@ int main(int argc, char* argv[])
             if (const CarlaPluginInfo* const pluginInfo = carla_get_plugin_info(0))
             {
                 if (pluginInfo->hints & CarlaBackend::PLUGIN_HAS_CUSTOM_UI)
-                    carla_show_custom_ui(0, true);
+                {
+#ifdef CARLA_OS_LINUX
+                    if (std::getenv("DISPLAY") != nullptr)
+#endif
+                        carla_show_custom_ui(0, true);
+                }
             }
         }
 

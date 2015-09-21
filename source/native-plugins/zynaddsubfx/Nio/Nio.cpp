@@ -5,6 +5,8 @@
 #include "MidiIn.h"
 #include "AudioOut.h"
 #include "WavEngine.h"
+#include "../Misc/Config.h"
+#include <cstring>
 #include <iostream>
 #include <algorithm>
 using std::string;
@@ -12,26 +14,40 @@ using std::set;
 using std::cerr;
 using std::endl;
 
+#ifndef IN_DEFAULT
+#define IN_DEFAULT "NULL"
+#endif
+#ifndef OUT_DEFAULT
+#define OUT_DEFAULT "NULL"
+#endif
+
 InMgr     *in  = NULL;
 OutMgr    *out = NULL;
 EngineMgr *eng = NULL;
 string     postfix;
 
-bool   Nio::autoConnect   = false;
-string Nio::defaultSource = IN_DEFAULT;
-string Nio::defaultSink   = OUT_DEFAULT;
+bool   Nio::autoConnect     = false;
+bool   Nio::pidInClientName = false;
+string Nio::defaultSource   = IN_DEFAULT;
+string Nio::defaultSink     = OUT_DEFAULT;
 
-void Nio::init(void)
+void Nio::init(const SYNTH_T &synth, const oss_devs_t& oss_devs,
+               class Master *master)
 {
     in  = &InMgr::getInstance(); //Enable input wrapper
-    out = &OutMgr::getInstance(); //Initialize the Output Systems
-    eng = &EngineMgr::getInstance(); //Initialize The Engines
+    out = &OutMgr::getInstance(&synth); //Initialize the Output Systems
+    eng = &EngineMgr::getInstance(&synth, &oss_devs); //Initialize the Engines
+
+    in->setMaster(master);
+    out->setMaster(master);
 }
 
 bool Nio::start()
 {
-    init();
-    return eng->start();
+    if(eng)
+        return eng->start();
+    else
+        return false;
 }
 
 void Nio::stop()
@@ -105,6 +121,19 @@ string Nio::getSink()
 #include <jack/jack.h>
 void Nio::preferedSampleRate(unsigned &rate)
 {
+#if __linux__
+    //avoid checking in with jack if it's off
+    FILE *ps = popen("ps aux", "r");
+    char buffer[4096];
+    while(fgets(buffer, sizeof(buffer), ps))
+        if(strstr(buffer, "jack"))
+            break;
+    fclose(ps);
+
+    if(!strstr(buffer, "jack"))
+        return;
+#endif
+
     jack_client_t *client = jack_client_open("temp-client",
                                              JackNoStartServer, 0);
     if(client) {
@@ -116,6 +145,12 @@ void Nio::preferedSampleRate(unsigned &rate)
 void Nio::preferedSampleRate(unsigned &)
 {}
 #endif
+
+void Nio::masterSwap(Master *master)
+{
+    in->setMaster(master);
+    out->setMaster(master);
+}
 
 void Nio::waveNew(class WavFile *wave)
 {

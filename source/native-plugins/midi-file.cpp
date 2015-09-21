@@ -29,8 +29,8 @@ public:
     MidiFilePlugin(const NativeHostDescriptor* const host)
         : NativePluginClass(host),
           fMidiOut(this),
-          fWasPlayingBefore(false),
-          leakDetector_MidiFilePlugin() {}
+          fNeedsAllNotesOff(false),
+          fWasPlayingBefore(false) {}
 
 protected:
     // -------------------------------------------------------------------
@@ -54,32 +54,35 @@ protected:
     {
         const NativeTimeInfo* const timePos(getTimeInfo());
 
-        if (timePos->playing)
+        if (fWasPlayingBefore != timePos->playing)
         {
-            fMidiOut.play(timePos->frame, frames);
+            fNeedsAllNotesOff = true;
+            fWasPlayingBefore = timePos->playing;
         }
-        else if (fWasPlayingBefore)
+
+        if (fNeedsAllNotesOff)
         {
             NativeMidiEvent midiEvent;
 
             midiEvent.port    = 0;
             midiEvent.time    = 0;
-            midiEvent.data[0] = MIDI_STATUS_CONTROL_CHANGE;
+            midiEvent.data[0] = 0;
             midiEvent.data[1] = MIDI_CONTROL_ALL_NOTES_OFF;
             midiEvent.data[2] = 0;
             midiEvent.data[3] = 0;
             midiEvent.size    = 3;
 
-            for (int i=0; i < MAX_MIDI_CHANNELS; ++i)
+            for (int channel=MAX_MIDI_CHANNELS; --channel >= 0;)
             {
-                midiEvent.data[0] = uint8_t(MIDI_STATUS_CONTROL_CHANGE+i);
+                midiEvent.data[0] = uint8_t(MIDI_STATUS_CONTROL_CHANGE | (channel & MIDI_CHANNEL_BIT));
                 NativePluginClass::writeMidiEvent(&midiEvent);
             }
 
-            carla_stdout("WAS PLAYING BEFORE, NOW STOPPED");
+            fNeedsAllNotesOff = false;
         }
 
-        fWasPlayingBefore = timePos->playing;
+        if (fWasPlayingBefore)
+            fMidiOut.play(timePos->frame, frames);
     }
 
     // -------------------------------------------------------------------
@@ -97,14 +100,27 @@ protected:
     }
 
     // -------------------------------------------------------------------
+    // Plugin state calls
+
+    char* getState() const override
+    {
+        return fMidiOut.getState();
+    }
+
+    void setState(const char* const data) override
+    {
+        fMidiOut.setState(data);
+    }
+
+    // -------------------------------------------------------------------
     // AbstractMidiPlayer calls
 
-    void writeMidiEvent(const uint8_t port, const uint64_t timePosFrame, const RawMidiEvent* const event) override
+    void writeMidiEvent(const uint8_t port, const long double timePosFrame, const RawMidiEvent* const event) override
     {
         NativeMidiEvent midiEvent;
 
         midiEvent.port    = port;
-        midiEvent.time    = uint32_t(event->time-timePosFrame);
+        midiEvent.time    = uint32_t(timePosFrame);
         midiEvent.size    = event->size;
         midiEvent.data[0] = event->data[0];
         midiEvent.data[1] = event->data[1];
@@ -118,6 +134,7 @@ protected:
 
 private:
     MidiPattern fMidiOut;
+    bool fNeedsAllNotesOff;
     bool fWasPlayingBefore;
 
     void _loadMidiFile(const char* const filename)
@@ -187,6 +204,8 @@ private:
                 fMidiOut.addRaw(static_cast<uint64_t>(time), midiMessage.getRawData(), static_cast<uint8_t>(dataSize));
             }
         }
+
+        fNeedsAllNotesOff = true;
     }
 
     PluginClassEND(MidiFilePlugin)
@@ -200,8 +219,9 @@ static const NativePluginDescriptor midifileDesc = {
     /* hints     */ static_cast<NativePluginHints>(NATIVE_PLUGIN_IS_RTSAFE
                                                   |NATIVE_PLUGIN_HAS_UI
                                                   |NATIVE_PLUGIN_NEEDS_UI_OPEN_SAVE
+                                                  |NATIVE_PLUGIN_USES_STATE
                                                   |NATIVE_PLUGIN_USES_TIME),
-    /* supports  */ static_cast<NativePluginSupports>(0x0),
+    /* supports  */ NATIVE_PLUGIN_SUPPORTS_NOTHING,
     /* audioIns  */ 0,
     /* audioOuts */ 0,
     /* midiIns   */ 0,

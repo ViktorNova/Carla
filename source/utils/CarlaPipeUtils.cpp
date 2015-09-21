@@ -20,16 +20,22 @@
 #include "CarlaMIDI.h"
 
 // needed for atom-util
-#undef NULL
-#define NULL nullptr
+#ifndef nullptr
+# undef NULL
+# define NULL nullptr
+#endif
 
-#include "juce_core.h"
-#include "lv2/atom-util.h"
+#ifdef BUILDING_CARLA
+# include "lv2/atom-util.h"
+#else
+# include "lv2/lv2plug.in/ns/ext/atom/util.h"
+#endif
 
 #include <clocale>
 
 #ifdef CARLA_OS_WIN
 # include <ctime>
+# include "juce_core.h"
 #else
 # include <cerrno>
 # include <fcntl.h>
@@ -147,6 +153,40 @@ ssize_t WriteFileNonBlock(const HANDLE pipeh, const HANDLE cancelh, const void* 
 #endif // CARLA_OS_WIN
 
 // -----------------------------------------------------------------------
+// getMillisecondCounter
+
+static uint32_t lastMSCounterValue = 0;
+
+static inline
+uint32_t getMillisecondCounter() noexcept
+{
+    uint32_t now;
+
+#ifdef CARLA_OS_WIN
+    now = static_cast<uint32_t>(timeGetTime());
+#else
+    timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    now =  t.tv_sec * 1000 + t.tv_nsec / 1000000;
+#endif
+
+    if (now < lastMSCounterValue)
+    {
+        // in multi-threaded apps this might be called concurrently, so
+        // make sure that our last counter value only increases and doesn't
+        // go backwards..
+        if (now < lastMSCounterValue - 1000)
+            lastMSCounterValue = now;
+    }
+    else
+    {
+        lastMSCounterValue = now;
+    }
+
+    return now;
+}
+
+// -----------------------------------------------------------------------
 // startProcess
 
 #ifdef CARLA_OS_WIN
@@ -158,9 +198,6 @@ bool startProcess(const char* const argv[], PROCESS_INFORMATION* const processIn
     using juce::String;
 
     String command;
-
-    // TESTING
-    command = "C:\\Python34\\python.exe ";
 
     for (int i=0; argv[i] != nullptr; ++i)
     {
@@ -204,14 +241,12 @@ bool startProcess(const char* const argv[], pid_t& pidinst) noexcept
         CarlaString error(std::strerror(errno));
         carla_stderr2("exec failed: %s", error.buffer());
 
-        _exit(0); // this is not noexcept safe but doesn't matter anyway
+        _exit(1); // this is not noexcept safe but doesn't matter anyway
     }   break;
 
     case -1: { // error
         CarlaString error(std::strerror(errno));
         carla_stderr2("fork() failed: %s", error.buffer());
-
-        _exit(0); // this is not noexcept safe but doesn't matter anyway
     }   break;
     }
 
@@ -236,7 +271,7 @@ bool waitForClientFirstMessage(const P& pipe, const uint32_t timeOutMilliseconds
 
     char c;
     ssize_t ret;
-    const uint32_t timeoutEnd(juce::Time::getMillisecondCounter() + timeOutMilliseconds);
+    const uint32_t timeoutEnd(getMillisecondCounter() + timeOutMilliseconds);
 
     for (;;)
     {
@@ -256,7 +291,7 @@ bool waitForClientFirstMessage(const P& pipe, const uint32_t timeOutMilliseconds
             if (errno == EAGAIN)
 #endif
             {
-                if (juce::Time::getMillisecondCounter() < timeoutEnd)
+                if (getMillisecondCounter() < timeoutEnd)
                 {
                     carla_msleep(5);
                     continue;
@@ -308,14 +343,14 @@ bool waitForProcessToStop(const PROCESS_INFORMATION& processInfo, const uint32_t
 
     // TODO - this code is completly wrong...
 
-    const uint32_t timeoutEnd(juce::Time::getMillisecondCounter() + timeOutMilliseconds);
+    const uint32_t timeoutEnd(getMillisecondCounter() + timeOutMilliseconds);
 
     for (;;)
     {
         if (WaitForSingleObject(processInfo.hProcess, 0) == WAIT_OBJECT_0)
             return true;
 
-        if (juce::Time::getMillisecondCounter() >= timeoutEnd)
+        if (getMillisecondCounter() >= timeoutEnd)
             break;
 
         carla_msleep(5);
@@ -343,13 +378,13 @@ void waitForProcessToStopOrKillIt(const PROCESS_INFORMATION& processInfo, const 
 }
 #else
 static inline
-bool waitForChildToStop(const pid_t pid, const uint32_t timeOutMilliseconds) noexcept
+bool waitForChildToStop(const pid_t pid, const uint32_t timeOutMilliseconds, bool sendTerminate) noexcept
 {
     CARLA_SAFE_ASSERT_RETURN(pid > 0, false);
     CARLA_SAFE_ASSERT_RETURN(timeOutMilliseconds > 0, false);
 
     pid_t ret;
-    const uint32_t timeoutEnd(juce::Time::getMillisecondCounter() + timeOutMilliseconds);
+    const uint32_t timeoutEnd(getMillisecondCounter() + timeOutMilliseconds);
 
     for (;;)
     {
@@ -374,7 +409,12 @@ bool waitForChildToStop(const pid_t pid, const uint32_t timeOutMilliseconds) noe
             break;
 
         case 0:
-            if (juce::Time::getMillisecondCounter() < timeoutEnd)
+            if (sendTerminate)
+            {
+                sendTerminate = false;
+                ::kill(pid, SIGTERM);
+            }
+            if (getMillisecondCounter() < timeoutEnd)
             {
                 carla_msleep(5);
                 continue;
@@ -407,14 +447,14 @@ void waitForChildToStopOrKillIt(pid_t& pid, const uint32_t timeOutMilliseconds) 
     CARLA_SAFE_ASSERT_RETURN(pid > 0,);
     CARLA_SAFE_ASSERT_RETURN(timeOutMilliseconds > 0,);
 
-    if (! waitForChildToStop(pid, timeOutMilliseconds))
+    if (! waitForChildToStop(pid, timeOutMilliseconds, true))
     {
         carla_stderr("waitForChildToStopOrKillIt() - process didn't stop, force killing");
 
         if (::kill(pid, SIGKILL) != -1)
         {
             // wait for killing to take place
-            waitForChildToStop(pid, timeOutMilliseconds);
+            waitForChildToStop(pid, timeOutMilliseconds, false);
         }
         else
         {
@@ -474,7 +514,7 @@ struct CarlaPipeCommon::PrivateData {
         } CARLA_SAFE_EXCEPTION("CreateEvent");
 #endif
 
-        carla_zeroChar(tmpBuf, 0xff+1);
+        carla_zeroChars(tmpBuf, 0xff+1);
     }
 
     ~PrivateData() noexcept
@@ -494,8 +534,7 @@ struct CarlaPipeCommon::PrivateData {
 // -----------------------------------------------------------------------
 
 CarlaPipeCommon::CarlaPipeCommon() noexcept
-    : pData(new PrivateData()),
-      leakDetector_CarlaPipeCommon()
+    : pData(new PrivateData())
 {
     carla_debug("CarlaPipeCommon::CarlaPipeCommon()");
 }
@@ -760,12 +799,12 @@ bool CarlaPipeCommon::writeAndFixMessage(const char* const msg) const noexcept
         if (fixedMsg[size-1] == '\r')
         {
             fixedMsg[size-1] = '\n';
-            fixedMsg[size]   = '\0';
+            fixedMsg[size  ] = '\0';
             fixedMsg[size+1] = '\0';
         }
         else
         {
-            fixedMsg[size]   = '\n';
+            fixedMsg[size  ] = '\n';
             fixedMsg[size+1] = '\0';
         }
     }
@@ -923,7 +962,8 @@ void CarlaPipeCommon::writeLv2AtomMessage(const uint32_t index, const LV2_Atom* 
     char tmpBuf[0xff+1];
     tmpBuf[0xff] = '\0';
 
-    CarlaString base64atom(CarlaString::asBase64(atom, lv2_atom_total_size(atom)));
+    const uint32_t atomTotalSize(lv2_atom_total_size(atom));
+    CarlaString base64atom(CarlaString::asBase64(atom, atomTotalSize));
 
     const CarlaMutexLocker cml(pData->writeLock);
 
@@ -933,7 +973,7 @@ void CarlaPipeCommon::writeLv2AtomMessage(const uint32_t index, const LV2_Atom* 
         std::snprintf(tmpBuf, 0xff, "%i\n", index);
         _writeMsgBuffer(tmpBuf, std::strlen(tmpBuf));
 
-        std::snprintf(tmpBuf, 0xff, "%i\n", atom->size);
+        std::snprintf(tmpBuf, 0xff, "%i\n", atomTotalSize);
         _writeMsgBuffer(tmpBuf, std::strlen(tmpBuf));
 
         writeAndFixMessage(base64atom.buffer());
@@ -977,7 +1017,7 @@ const char* CarlaPipeCommon::_readline() const noexcept
 
     pData->tmpStr.clear();
 
-    for (int i=0; i < 0xff; ++i)
+    for (int i=0; i<0xff; ++i)
     {
         try {
 #ifdef CARLA_OS_WIN
@@ -988,52 +1028,49 @@ const char* CarlaPipeCommon::_readline() const noexcept
 #endif
         } CARLA_SAFE_EXCEPTION_BREAK("CarlaPipeCommon::readline() - read");
 
-        if (ret == 1 && c != '\n')
+        if (ret != 1 || c == '\n')
+            break;
+
+        if (c == '\r')
+            c = '\n';
+
+        *ptr++ = c;
+
+        if (i+1 == 0xff)
         {
-            if (c == '\r')
-                c = '\n';
-
-            *ptr++ = c;
-
-            if (i+1 == 0xff)
-            {
-                i = 0;
-                ptr = pData->tmpBuf;
-                pData->tmpStr += pData->tmpBuf;
-            }
-
-            continue;
+            i = 0;
+            *ptr = '\0';
+            pData->tmpStr += pData->tmpBuf;
+            ptr = pData->tmpBuf;
         }
-
-        if (pData->tmpStr.isNotEmpty() || ptr != pData->tmpBuf || ret == 1)
-        {
-            if (ptr != pData->tmpBuf)
-            {
-                *ptr = '\0';
-                pData->tmpStr += pData->tmpBuf;
-            }
-
-            try {
-                return pData->tmpStr.dup();
-            } CARLA_SAFE_EXCEPTION_RETURN("CarlaPipeCommon::readline() - dup", nullptr);
-        }
-
-        break;
     }
 
-    return nullptr;
+    if (ptr != pData->tmpBuf)
+    {
+        *ptr = '\0';
+        pData->tmpStr += pData->tmpBuf;
+    }
+    else if (pData->tmpStr.isEmpty() && ret != 1)
+    {
+        // some error
+        return nullptr;
+    }
+
+    try {
+        return pData->tmpStr.dup();
+    } CARLA_SAFE_EXCEPTION_RETURN("CarlaPipeCommon::readline() - dup", nullptr);
 }
 
 const char* CarlaPipeCommon::_readlineblock(const uint32_t timeOutMilliseconds) const noexcept
 {
-    const uint32_t timeoutEnd(juce::Time::getMillisecondCounter() + timeOutMilliseconds);
+    const uint32_t timeoutEnd(getMillisecondCounter() + timeOutMilliseconds);
 
     for (;;)
     {
         if (const char* const msg = _readline())
             return msg;
 
-        if (juce::Time::getMillisecondCounter() >= timeoutEnd)
+        if (getMillisecondCounter() >= timeoutEnd)
             break;
 
         carla_msleep(5);
@@ -1072,8 +1109,7 @@ bool CarlaPipeCommon::_writeMsgBuffer(const char* const msg, const std::size_t s
 // -----------------------------------------------------------------------
 
 CarlaPipeServer::CarlaPipeServer() noexcept
-    : CarlaPipeCommon(),
-      leakDetector_CarlaPipeServer()
+    : CarlaPipeCommon()
 {
     carla_debug("CarlaPipeServer::CarlaPipeServer()");
 }
@@ -1340,7 +1376,7 @@ bool CarlaPipeServer::startPipeServer(const char* const filename, const char* co
     if (::kill(pData->pid, SIGKILL) != -1)
     {
         // wait for killing to take place
-        waitForChildToStop(pData->pid, 2*1000);
+        waitForChildToStop(pData->pid, 2*1000, false);
     }
     pData->pid = -1;
 #endif
@@ -1445,8 +1481,7 @@ void CarlaPipeServer::writeHideMessage() const noexcept
 // -----------------------------------------------------------------------
 
 CarlaPipeClient::CarlaPipeClient() noexcept
-    : CarlaPipeCommon(),
-      leakDetector_CarlaPipeClient()
+    : CarlaPipeCommon()
 {
     carla_debug("CarlaPipeClient::CarlaPipeClient()");
 }

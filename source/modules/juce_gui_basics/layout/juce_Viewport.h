@@ -253,6 +253,8 @@ public:
     /** @internal */
     void componentMovedOrResized (Component&, bool wasMoved, bool wasResized) override;
     /** @internal */
+    void lookAndFeelChanged() override;
+    /** @internal */
     bool useMouseWheelMoveIfNeeded (const MouseEvent&, const MouseWheelDetails&);
     /** @internal */
     static bool respondsToKey (const KeyPress&);
@@ -264,9 +266,11 @@ private:
     int scrollBarThickness;
     int singleStepX, singleStepY;
     bool showHScrollbar, showVScrollbar, deleteContent;
+    bool customScrollBarThickness;
     bool allowScrollingWithoutScrollbarV, allowScrollingWithoutScrollbarH;
     Component contentHolder;
     ScrollBar verticalScrollBar, horizontalScrollBar;
+
     Point<int> viewportPosToCompPos (Point<int>) const;
 
     void updateVisibleArea();

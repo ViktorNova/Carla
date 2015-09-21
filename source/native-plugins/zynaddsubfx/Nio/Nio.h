@@ -4,13 +4,16 @@
 #include <set>
 
 class WavFile;
+class Master;
+struct SYNTH_T;
+class oss_devs_t;
 
 /**Interface to Nio Subsystem
  *
  * Should be only externally included header */
 namespace Nio
 {
-    void init(void);
+    void init(const SYNTH_T &synth, const oss_devs_t &oss_devs, Master *master);
     bool start(void);
     void stop(void);
 
@@ -32,6 +35,8 @@ namespace Nio
     //Get the prefered sample rate from jack (if running)
     void preferedSampleRate(unsigned &rate);
 
+    //Complete Master Swaps to ONLY BE CALLED FROM RT CONTEXT
+    void masterSwap(Master *master);
 
     //Wave writing
     void waveNew(class WavFile *wave);
@@ -40,6 +45,7 @@ namespace Nio
     void waveEnd(void);
 
     extern bool autoConnect;
+    extern bool pidInClientName;
     extern std::string defaultSource;
     extern std::string defaultSink;
 };

@@ -19,6 +19,7 @@
 #include "CarlaLibUtils.hpp"
 #include "CarlaMathUtils.hpp"
 #include "CarlaMIDI.h"
+#include "LinkedList.hpp"
 
 #if defined(CARLA_OS_MAC) || defined(CARLA_OS_WIN)
 # define USE_JUCE_PROCESSORS
@@ -164,23 +165,21 @@ static intptr_t VSTCALLBACK vstHostCallback(AEffect* const effect, const int32_t
         break;
 
     case audioMasterCurrentId:
-        if (gVstCurrentUniqueId == 0) DISCOVERY_OUT("warning", "Plugin asked for uniqueId, but it's currently 0");
-
         ret = gVstCurrentUniqueId;
         break;
 
     case DECLARE_VST_DEPRECATED(audioMasterWantMidi):
-        if (gVstWantsMidi) DISCOVERY_OUT("warning", "Plugin requested MIDI more than once");
+        if (gVstWantsMidi) { DISCOVERY_OUT("warning", "Plugin requested MIDI more than once"); }
 
         gVstWantsMidi = true;
         ret = 1;
         break;
 
     case audioMasterGetTime:
-        if (! gVstIsProcessing) DISCOVERY_OUT("warning", "Plugin requested timeInfo out of process");
-        if (! gVstWantsTime)    DISCOVERY_OUT("warning", "Plugin requested timeInfo but didn't ask if host could do \"sendVstTimeInfo\"");
+        if (! gVstIsProcessing) { DISCOVERY_OUT("warning", "Plugin requested timeInfo out of process"); }
+        if (! gVstWantsTime)    { DISCOVERY_OUT("warning", "Plugin requested timeInfo but didn't ask if host could do \"sendVstTimeInfo\""); }
 
-        carla_zeroStruct<VstTimeInfo>(timeInfo);
+        carla_zeroStruct(timeInfo);
         timeInfo.sampleRate = kSampleRate;
 
         // Tempo
@@ -208,7 +207,7 @@ static intptr_t VSTCALLBACK vstHostCallback(AEffect* const effect, const int32_t
         break;
 
     case DECLARE_VST_DEPRECATED(audioMasterNeedIdle):
-        if (gVstNeedsIdle) DISCOVERY_OUT("warning", "Plugin requested idle more than once");
+        if (gVstNeedsIdle) { DISCOVERY_OUT("warning", "Plugin requested idle more than once"); }
 
         gVstNeedsIdle = true;
         ret = 1;
@@ -550,7 +549,7 @@ static void do_ladspa_check(lib_t& libHandle, const char* const filename, const 
 
                 if (LADSPA_IS_PORT_AUDIO(portDescriptor))
                 {
-                    carla_zeroFloat(bufferAudio[iA], kBufferSize);
+                    carla_zeroFloats(bufferAudio[iA], kBufferSize);
                     descriptor->connect_port(handle, j, bufferAudio[iA++]);
                 }
                 else if (LADSPA_IS_PORT_CONTROL(portDescriptor))
@@ -572,7 +571,7 @@ static void do_ladspa_check(lib_t& libHandle, const char* const filename, const 
                         DISCOVERY_OUT("warning", "Parameter '" << portName << "' is broken: min > max");
                         max = min + 0.1f;
                     }
-                    else if (carla_compareFloats(min, max))
+                    else if (carla_isEqual(min, max))
                     {
                         DISCOVERY_OUT("warning", "Parameter '" << portName << "' is broken: max == min");
                         max = min + 0.1f;
@@ -721,9 +720,14 @@ static void do_dssi_check(lib_t& libHandle, const char* const filename, const bo
             DISCOVERY_OUT("error", "Plugin '" << ldescriptor->Name << "' has no cleanup()");
             continue;
         }
-        if (ldescriptor->run == nullptr && descriptor->run_synth == nullptr && descriptor->run_multiple_synths == nullptr)
+        if (ldescriptor->run == nullptr && descriptor->run_synth == nullptr)
         {
-            DISCOVERY_OUT("error", "Plugin '" << ldescriptor->Name << "' has no run(), run_synth() or run_multiple_synths()");
+            DISCOVERY_OUT("error", "Plugin '" << ldescriptor->Name << "' has no run() or run_synth()");
+            continue;
+        }
+        if (descriptor->run_synth == nullptr && descriptor->run_multiple_synths != nullptr)
+        {
+            DISCOVERY_OUT("error", "Plugin '" << ldescriptor->Name << "' requires run_multiple_synths which is not supported");
             continue;
         }
         if (! LADSPA_IS_HARD_RT_CAPABLE(ldescriptor->Properties))
@@ -768,7 +772,7 @@ static void do_dssi_check(lib_t& libHandle, const char* const filename, const bo
             }
         }
 
-        if (descriptor->run_synth != nullptr || descriptor->run_multiple_synths != nullptr)
+        if (descriptor->run_synth != nullptr)
             midiIns = 1;
 
         if (midiIns > 0 && audioIns == 0 && audioOuts > 0)
@@ -816,7 +820,7 @@ static void do_dssi_check(lib_t& libHandle, const char* const filename, const bo
 
                 if (LADSPA_IS_PORT_AUDIO(portDescriptor))
                 {
-                    carla_zeroFloat(bufferAudio[iA], kBufferSize);
+                    carla_zeroFloats(bufferAudio[iA], kBufferSize);
                     ldescriptor->connect_port(handle, j, bufferAudio[iA++]);
                 }
                 else if (LADSPA_IS_PORT_CONTROL(portDescriptor))
@@ -838,7 +842,7 @@ static void do_dssi_check(lib_t& libHandle, const char* const filename, const bo
                         DISCOVERY_OUT("warning", "Parameter '" << portName << "' is broken: min > max");
                         max = min + 0.1f;
                     }
-                    else if (carla_compareFloats(min, max))
+                    else if (carla_isEqual(min, max))
                     {
                         DISCOVERY_OUT("warning", "Parameter '" << portName << "' is broken: max == min");
                         max = min + 0.1f;
@@ -882,10 +886,10 @@ static void do_dssi_check(lib_t& libHandle, const char* const filename, const bo
             if (ldescriptor->activate != nullptr)
                 ldescriptor->activate(handle);
 
-            if (descriptor->run_synth != nullptr || descriptor->run_multiple_synths != nullptr)
+            if (descriptor->run_synth != nullptr)
             {
                 snd_seq_event_t midiEvents[2];
-                carla_zeroStruct<snd_seq_event_t>(midiEvents, 2);
+                carla_zeroStructs(midiEvents, 2);
 
                 const unsigned long midiEventCount = 2;
 
@@ -898,15 +902,7 @@ static void do_dssi_check(lib_t& libHandle, const char* const filename, const bo
                 midiEvents[1].data.note.velocity = 0;
                 midiEvents[1].time.tick = kBufferSize/2;
 
-                if (descriptor->run_multiple_synths != nullptr && descriptor->run_synth == nullptr)
-                {
-                    LADSPA_Handle handlePtr[1] = { handle };
-                    snd_seq_event_t* midiEventsPtr[1] = { midiEvents };
-                    unsigned long midiEventCountPtr[1] = { midiEventCount };
-                    descriptor->run_multiple_synths(1, handlePtr, kBufferSize, midiEventsPtr, midiEventCountPtr);
-                }
-                else
-                    descriptor->run_synth(handle, kBufferSize, midiEvents, midiEventCount);
+                descriptor->run_synth(handle, kBufferSize, midiEvents, midiEventCount);
             }
             else
                 ldescriptor->run(handle, kBufferSize);
@@ -1036,7 +1032,7 @@ static void do_lv2_check(const char* const bundle, const bool doInit)
                 {
                     DISCOVERY_OUT("warning", "Plugin '" << rdfDescriptor->URI << "' DSP wants UI feature '" << feature.URI << "', ignoring this");
                 }
-                else if (LV2_IS_FEATURE_REQUIRED(feature.Type) && ! is_lv2_feature_supported(feature.URI))
+                else if (feature.Required && ! is_lv2_feature_supported(feature.URI))
                 {
                     DISCOVERY_OUT("error", "Plugin '" << rdfDescriptor->URI << "' requires a non-supported feature '" << feature.URI << "'");
                     supported = false;
@@ -1158,7 +1154,7 @@ static void do_vst_check(lib_t& libHandle, const bool doInit)
         }
     }
 
-    AEffect* const effect = vstFn(vstHostCallback);
+    AEffect* effect = vstFn(vstHostCallback);
 
     if (effect == nullptr || effect->magic != kEffectMagic)
     {
@@ -1173,8 +1169,6 @@ static void do_vst_check(lib_t& libHandle, const bool doInit)
         return;
     }
 
-    gVstCurrentUniqueId = effect->uniqueID;
-
     effect->dispatcher(effect, DECLARE_VST_DEPRECATED(effIdentify), 0, 0, nullptr, 0.0f);
     effect->dispatcher(effect, DECLARE_VST_DEPRECATED(effSetBlockSizeAndSampleRate), 0, kBufferSize, nullptr, kSampleRate);
     effect->dispatcher(effect, effSetSampleRate, 0, 0, nullptr, kSampleRate);
@@ -1182,47 +1176,86 @@ static void do_vst_check(lib_t& libHandle, const bool doInit)
     effect->dispatcher(effect, effSetProcessPrecision, 0, kVstProcessPrecision32, nullptr, 0.0f);
 
     effect->dispatcher(effect, effOpen, 0, 0, nullptr, 0.0f);
-    effect->dispatcher(effect, effSetProgram, 0, 0, nullptr, 0.0f);
+
+    if (effect->numPrograms > 0)
+        effect->dispatcher(effect, effSetProgram, 0, 0, nullptr, 0.0f);
+
+    const bool isShell  = (effect->dispatcher(effect, effGetPlugCategory, 0, 0, nullptr, 0.0f) == kPlugCategShell);
+    gVstCurrentUniqueId =  effect->uniqueID;
 
     char strBuf[STR_MAX+1];
     CarlaString cName;
     CarlaString cProduct;
     CarlaString cVendor;
+    LinkedList<intptr_t> uniqueIds;
 
-    const intptr_t vstCategory = effect->dispatcher(effect, effGetPlugCategory, 0, 0, nullptr, 0.0f);
-
-    //for (int32_t i = effect->numInputs;  --i >= 0;) effect->dispatcher(effect, DECLARE_VST_DEPRECATED(effConnectInput),  i, 1, 0, 0);
-    //for (int32_t i = effect->numOutputs; --i >= 0;) effect->dispatcher(effect, DECLARE_VST_DEPRECATED(effConnectOutput), i, 1, 0, 0);
-
-    carla_zeroChar(strBuf, STR_MAX+1);
-
-    if (effect->dispatcher(effect, effGetVendorString, 0, 0, strBuf, 0.0f) == 1)
-        cVendor = strBuf;
-
-    carla_zeroChar(strBuf, STR_MAX+1);
-
-    if (vstCategory == kPlugCategShell)
+    if (isShell)
     {
-        gVstCurrentUniqueId = effect->dispatcher(effect, effShellGetNextPlugin, 0, 0, strBuf, 0.0f);
+        for (;;)
+        {
+            carla_zeroChars(strBuf, STR_MAX+1);
 
-        CARLA_SAFE_ASSERT_RETURN(gVstCurrentUniqueId != 0,);
-        cName = strBuf;
+            gVstCurrentUniqueId = effect->dispatcher(effect, effShellGetNextPlugin, 0, 0, strBuf, 0.0f);
+
+            if (gVstCurrentUniqueId == 0)
+                break;
+
+            uniqueIds.append(gVstCurrentUniqueId);
+        }
+
+        effect->dispatcher(effect, effClose, 0, 0, nullptr, 0.0f);
+        effect = nullptr;
     }
     else
     {
-        if (effect->dispatcher(effect, effGetEffectName, 0, 0, strBuf, 0.0f) == 1)
-            cName = strBuf;
+        uniqueIds.append(gVstCurrentUniqueId);
     }
 
-    for (;;)
+    for (LinkedList<intptr_t>::Itenerator it = uniqueIds.begin2(); it.valid(); it.next())
     {
-        carla_zeroChar(strBuf, STR_MAX+1);
+        gVstCurrentUniqueId = it.getValue(0);
+
+        if (effect == nullptr)
+        {
+            effect = vstFn(vstHostCallback);
+
+            effect->dispatcher(effect, DECLARE_VST_DEPRECATED(effIdentify), 0, 0, nullptr, 0.0f);
+            effect->dispatcher(effect, DECLARE_VST_DEPRECATED(effSetBlockSizeAndSampleRate), 0, kBufferSize, nullptr, kSampleRate);
+            effect->dispatcher(effect, effSetSampleRate, 0, 0, nullptr, kSampleRate);
+            effect->dispatcher(effect, effSetBlockSize, 0, kBufferSize, nullptr, 0.0f);
+            effect->dispatcher(effect, effSetProcessPrecision, 0, kVstProcessPrecision32, nullptr, 0.0f);
+
+            effect->dispatcher(effect, effOpen, 0, 0, nullptr, 0.0f);
+
+            if (effect->numPrograms > 0)
+                effect->dispatcher(effect, effSetProgram, 0, 0, nullptr, 0.0f);
+        }
+
+        // get name
+        carla_zeroChars(strBuf, STR_MAX+1);
+
+        if (effect->dispatcher(effect, effGetEffectName, 0, 0, strBuf, 0.0f) == 1)
+            cName = strBuf;
+        else
+            cName.clear();
+
+        // get product
+        carla_zeroChars(strBuf, STR_MAX+1);
 
         if (effect->dispatcher(effect, effGetProductString, 0, 0, strBuf, 0.0f) == 1)
             cProduct = strBuf;
         else
             cProduct.clear();
 
+        // get vendor
+        carla_zeroChars(strBuf, STR_MAX+1);
+
+        if (effect->dispatcher(effect, effGetVendorString, 0, 0, strBuf, 0.0f) == 1)
+            cVendor = strBuf;
+        else
+            cVendor.clear();
+
+        // get everything else
         uint hints = 0x0;
         int audioIns = effect->numInputs;
         int audioOuts = effect->numOutputs;
@@ -1266,14 +1299,14 @@ static void do_vst_check(lib_t& libHandle, const bool doInit)
             for (int j=0; j < audioIns; ++j)
             {
                 bufferAudioIn[j] = new float[kBufferSize];
-                carla_zeroFloat(bufferAudioIn[j], kBufferSize);
+                carla_zeroFloats(bufferAudioIn[j], kBufferSize);
             }
 
             float* bufferAudioOut[audioOuts];
             for (int j=0; j < audioOuts; ++j)
             {
                 bufferAudioOut[j] = new float[kBufferSize];
-                carla_zeroFloat(bufferAudioOut[j], kBufferSize);
+                carla_zeroFloats(bufferAudioOut[j], kBufferSize);
             }
 
             struct VstEventsFixed {
@@ -1290,7 +1323,7 @@ static void do_vst_check(lib_t& libHandle, const bool doInit)
             } events;
 
             VstMidiEvent midiEvents[2];
-            carla_zeroStruct<VstMidiEvent>(midiEvents, 2);
+            carla_zeroStructs(midiEvents, 2);
 
             midiEvents[0].type = kVstMidiType;
             midiEvents[0].byteSize = sizeof(VstMidiEvent);
@@ -1352,21 +1385,20 @@ static void do_vst_check(lib_t& libHandle, const bool doInit)
         DISCOVERY_OUT("parameters.ins", parameters);
         DISCOVERY_OUT("end", "------------");
 
-        if (vstCategory != kPlugCategShell)
-            break;
-
         gVstWantsMidi = false;
         gVstWantsTime = false;
 
-        carla_zeroChar(strBuf, STR_MAX+1);
-
-        gVstCurrentUniqueId = effect->dispatcher(effect, effShellGetNextPlugin, 0, 0, strBuf, 0.0f);
-
-        if (gVstCurrentUniqueId != 0)
-            cName = strBuf;
-        else
+        if (! isShell)
             break;
+
+        effect->dispatcher(effect, effClose, 0, 0, nullptr, 0.0f);
+        effect = nullptr;
     }
+
+    uniqueIds.clear();
+
+    if (effect == nullptr)
+        return;
 
     if (gVstNeedsIdle)
         effect->dispatcher(effect, DECLARE_VST_DEPRECATED(effIdle), 0, 0, nullptr, 0.0f);
@@ -1394,7 +1426,7 @@ static void do_juce_check(const char* const filename_, const char* const stype, 
     }
     else
 #endif
-     filename = File(filename_).getFullPathName();
+    filename = File(filename_).getFullPathName();
 
     juce::ScopedPointer<AudioPluginFormat> pluginFormat;
 

@@ -25,8 +25,7 @@ CARLA_BACKEND_START_NAMESPACE
 
 CarlaEngineThread::CarlaEngineThread(CarlaEngine* const engine) noexcept
     : CarlaThread("CarlaEngineThread"),
-      kEngine(engine),
-      leakDetector_CarlaEngineThread()
+      kEngine(engine)
 {
     CARLA_SAFE_ASSERT(engine != nullptr);
     carla_debug("CarlaEngineThread::CarlaEngineThread(%p)", engine);
@@ -47,6 +46,9 @@ void CarlaEngineThread::run() noexcept
 #endif
     carla_debug("CarlaEngineThread::run()");
 
+#ifdef HAVE_LIBLO
+    const bool isPlugin(kEngine->getType() == kEngineTypePlugin);
+#endif
     float value;
 
 #ifdef BUILD_BRIDGE
@@ -59,6 +61,11 @@ void CarlaEngineThread::run() noexcept
         const bool oscRegisted = kEngine->isOscControlRegistered();
 #else
         const bool oscRegisted = false;
+#endif
+
+#ifdef HAVE_LIBLO
+        if (isPlugin)
+            kEngine->idleOsc();
 #endif
 
         for (uint i=0, count = kEngine->getCurrentPluginCount(); i < count; ++i)

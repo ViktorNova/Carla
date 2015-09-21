@@ -18,6 +18,7 @@
 #ifndef CARLA_PATCHBAY_UTILS_HPP_INCLUDED
 #define CARLA_PATCHBAY_UTILS_HPP_INCLUDED
 
+#include "CarlaMutex.hpp"
 #include "LinkedList.hpp"
 
 #define STR_MAX 0xFF
@@ -102,6 +103,12 @@ struct PortNameToId {
         group = g;
         port  = p;
         rename(n, fn);
+    }
+
+    void setFullName(const char fn[]) noexcept
+    {
+        std::strncpy(fullName, fn, STR_MAX);
+        fullName[STR_MAX] = '\0';
     }
 
     void rename(const char n[], const char fn[]) noexcept
@@ -195,10 +202,12 @@ struct ConnectionToId {
 struct PatchbayConnectionList {
     uint lastId;
     LinkedList<ConnectionToId> list;
+    CarlaMutex mutex;
 
     PatchbayConnectionList() noexcept
         : lastId(0),
-          list() {}
+          list(),
+          mutex() {}
 
     void clear() noexcept
     {

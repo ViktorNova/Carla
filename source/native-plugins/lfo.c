@@ -267,7 +267,7 @@ static void lfo_process(NativePluginHandle handle, float** inBuffer, float** out
 static const NativePluginDescriptor lfoDesc = {
     .category  = NATIVE_PLUGIN_CATEGORY_UTILITY,
     .hints     = NATIVE_PLUGIN_IS_RTSAFE,
-    .supports  = 0x0,
+    .supports  = NATIVE_PLUGIN_SUPPORTS_NOTHING,
     .audioIns  = 0,
     .audioOuts = 0,
     .midiIns   = 0,
@@ -285,7 +285,6 @@ static const NativePluginDescriptor lfoDesc = {
     .get_parameter_count = lfo_get_parameter_count,
     .get_parameter_info  = lfo_get_parameter_info,
     .get_parameter_value = lfo_get_parameter_value,
-    .get_parameter_text  = NULL,
 
     .get_midi_program_count = NULL,
     .get_midi_program_info  = NULL,

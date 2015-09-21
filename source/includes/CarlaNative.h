@@ -59,7 +59,7 @@ typedef enum {
     NATIVE_PLUGIN_NEEDS_FIXED_BUFFERS  = 1 <<  3,
     NATIVE_PLUGIN_NEEDS_UI_MAIN_THREAD = 1 <<  4,
     NATIVE_PLUGIN_NEEDS_UI_OPEN_SAVE   = 1 <<  6,
-    NATIVE_PLUGIN_USES_MULTI_PROGS     = 1 <<  7, /** has 1 patch per midi channel           */
+    NATIVE_PLUGIN_USES_MULTI_PROGS     = 1 <<  7, /** has 1 program per midi channel         */
     NATIVE_PLUGIN_USES_PANNING         = 1 <<  8, /** uses stereo balance if unset (default) */
     NATIVE_PLUGIN_USES_STATE           = 1 <<  9,
     NATIVE_PLUGIN_USES_TIME            = 1 << 10,
@@ -67,6 +67,7 @@ typedef enum {
 } NativePluginHints;
 
 typedef enum {
+    NATIVE_PLUGIN_SUPPORTS_NOTHING          = 0,
     NATIVE_PLUGIN_SUPPORTS_PROGRAM_CHANGES  = 1 << 0, /** handles MIDI programs internally instead of host-exposed/exported */
     NATIVE_PLUGIN_SUPPORTS_CONTROL_CHANGES  = 1 << 1,
     NATIVE_PLUGIN_SUPPORTS_CHANNEL_PRESSURE = 1 << 2,
@@ -84,8 +85,7 @@ typedef enum {
     NATIVE_PARAMETER_IS_INTEGER       = 1 << 4,
     NATIVE_PARAMETER_IS_LOGARITHMIC   = 1 << 5,
     NATIVE_PARAMETER_USES_SAMPLE_RATE = 1 << 6,
-    NATIVE_PARAMETER_USES_SCALEPOINTS = 1 << 7,
-    NATIVE_PARAMETER_USES_CUSTOM_TEXT = 1 << 8
+    NATIVE_PARAMETER_USES_SCALEPOINTS = 1 << 7
 } NativeParameterHints;
 
 typedef enum {
@@ -103,7 +103,8 @@ typedef enum {
     NATIVE_HOST_OPCODE_RELOAD_PARAMETERS     = 3, /** nothing                                           */
     NATIVE_HOST_OPCODE_RELOAD_MIDI_PROGRAMS  = 4, /** nothing                                           */
     NATIVE_HOST_OPCODE_RELOAD_ALL            = 5, /** nothing                                           */
-    NATIVE_HOST_OPCODE_UI_UNAVAILABLE        = 6  /** nothing                                           */
+    NATIVE_HOST_OPCODE_UI_UNAVAILABLE        = 6, /** nothing                                           */
+    NATIVE_HOST_OPCODE_HOST_IDLE             = 7  /** nothing                                           */
 } NativeHostDispatcherOpcode;
 
 /* ------------------------------------------------------------------------------------------------------------
@@ -134,7 +135,7 @@ typedef struct {
     NativeParameterRanges ranges;
 
     uint32_t scalePointCount;
-    NativeParameterScalePoint* scalePoints;
+    const NativeParameterScalePoint* scalePoints;
 } NativeParameter;
 
 typedef struct {
@@ -224,7 +225,6 @@ typedef struct _NativePluginDescriptor {
     uint32_t               (*get_parameter_count)(NativePluginHandle handle);
     const NativeParameter* (*get_parameter_info)(NativePluginHandle handle, uint32_t index);
     float                  (*get_parameter_value)(NativePluginHandle handle, uint32_t index);
-    const char*            (*get_parameter_text)(NativePluginHandle handle, uint32_t index /*, float value*/);
 
     uint32_t                 (*get_midi_program_count)(NativePluginHandle handle);
     const NativeMidiProgram* (*get_midi_program_info)(NativePluginHandle handle, uint32_t index);
@@ -258,7 +258,10 @@ typedef struct _NativePluginDescriptor {
 extern void carla_register_native_plugin(const NativePluginDescriptor* desc);
 
 /** Called once on host init */
-void carla_register_all_plugins(void);
+void carla_register_all_native_plugins(void);
+
+/** Get meta-data only */
+const NativePluginDescriptor* carla_get_native_plugins_data(uint32_t* count);
 
 /* ------------------------------------------------------------------------------------------------------------ */
 

@@ -19,19 +19,139 @@
   Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
 */
-#include <stdio.h>
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 
+#include <rtosc/ports.h>
+#include <rtosc/port-sugar.h>
 
 #include "Config.h"
+#include "globals.h"
 #include "XMLwrapper.h"
 
-using namespace std;
+#define rStdString(name, len, ...) \
+    {STRINGIFY(name) "::s", rMap(length, len) DOC(__VA_ARGS__), NULL, rStringCb(name,len)}
+#define rStdStringCb(name, length) rBOIL_BEGIN \
+        if(!strcmp("", args)) {\
+            data.reply(loc, "s", obj->name); \
+        } else { \
+            strncpy(obj->name, rtosc_argument(msg, 0).s, length); \
+            data.broadcast(loc, "s", obj->name);\
+            rChangeCb \
+        } rBOIL_END
+
+
+
+
+#if 1
+#define rObject Config
+static const rtosc::Ports ports = {
+    //rString(cfg.LinuxOSSWaveOutDev),
+    //rString(cfg.LinuxOSSSeqInDev),
+    rParamI(cfg.SampleRate, "samples of audio per second"),
+    rParamI(cfg.SoundBufferSize, "Size of processed audio buffer"),
+    rParamI(cfg.OscilSize, "Size Of Oscillator Wavetable"),
+    rToggle(cfg.SwapStereo, "Swap Left And Right Channels"),
+    rToggle(cfg.BankUIAutoClose, "Automatic Closing of BackUI After Patch Selection"),
+    rParamI(cfg.GzipCompression, "Level of Gzip Compression For Save Files"),
+    rParamI(cfg.Interpolation, "Level of Interpolation, Linear/Cubic"),
+    {"cfg.presetsDirList", rProp(parameter) rDoc("list of preset search directories"), 0,
+        [](const char *msg, rtosc::RtData &d)
+        {
+            Config &c = *(Config*)d.obj;
+            if(rtosc_narguments(msg) != 0) {
+                std::string args = rtosc_argument_string(msg);
+
+                //clear everything
+                c.clearpresetsdirlist();
+                for(int i=0; i<(int)args.size(); ++i)
+                    if(args[i] == 's')
+                        c.cfg.presetsDirList[i] = rtosc_argument(msg, i).s;
+            }
+
+            char         types[MAX_BANK_ROOT_DIRS+1];
+            rtosc_arg_t  args[MAX_BANK_ROOT_DIRS];
+            size_t       pos    = 0;
+
+            //zero out data
+            memset(types, 0, sizeof(types));
+            memset(args,  0, sizeof(args));
+
+            for(int i=0; i<MAX_BANK_ROOT_DIRS; ++i) {
+                if(!c.cfg.presetsDirList[i].empty()) {
+                    types[pos] = 's';
+                    args[pos].s  = c.cfg.presetsDirList[i].c_str();
+                    pos++;
+                }
+            }
+            char buffer[1024*5];
+            rtosc_amessage(buffer, sizeof(buffer), d.loc, types, args);
+            d.reply(buffer);
+        }},
+    {"cfg.bankRootDirList", rProp(parameter) rDoc("list of bank search directories"), 0,
+        [](const char *msg, rtosc::RtData &d)
+        {
+            Config &c = *(Config*)d.obj;
+            if(rtosc_narguments(msg) != 0) {
+                std::string args = rtosc_argument_string(msg);
+
+                //clear everything
+                c.clearbankrootdirlist();
+                for(int i=0; i<(int)args.size(); ++i)
+                    if(args[i] == 's')
+                        c.cfg.bankRootDirList[i] = rtosc_argument(msg, i).s;
+            }
+
+            char         types[MAX_BANK_ROOT_DIRS+1];
+            rtosc_arg_t  args[MAX_BANK_ROOT_DIRS];
+            size_t       pos    = 0;
+
+            //zero out data
+            memset(types, 0, sizeof(types));
+            memset(args,  0, sizeof(args));
+
+            for(int i=0; i<MAX_BANK_ROOT_DIRS; ++i) {
+                if(!c.cfg.bankRootDirList[i].empty()) {
+                    types[pos] = 's';
+                    args[pos].s  = c.cfg.bankRootDirList[i].c_str();
+                    pos++;
+                }
+            }
+            char buffer[1024*5];
+            rtosc_amessage(buffer, sizeof(buffer), d.loc, types, args);
+            d.reply(buffer);
+        }},
+
+    //rArrayS(cfg.bankRootDirList,MAX_BANK_ROOT_DIRS),
+    //rString(cfg.currentBankDir),
+    //rArrayS(cfg.presetsDirList,MAX_BANK_ROOT_DIRS),
+    rToggle(cfg.CheckPADsynth, "Old Check For PADsynth functionality within a patch"),
+    rToggle(cfg.IgnoreProgramChange, "Ignore MIDI Program Change Events"),
+    rParamI(cfg.UserInterfaceMode,   "Beginner/Advanced Mode Select"),
+    rParamI(cfg.VirKeybLayout,       "Keyboard Layout For Virtual Piano Keyboard"),
+    //rParamS(cfg.LinuxALSAaudioDev),
+    //rParamS(cfg.nameTag)
+    {"cfg.OscilPower::i", rDoc("Size Of Oscillator Wavetable"), 0,
+        [](const char *msg, rtosc::RtData &d)
+        {
+            Config &c = *(Config*)d.obj;
+            if(rtosc_narguments(msg) == 0) {
+                d.reply(d.loc, "i", (int)(log(c.cfg.OscilSize*1.0)/log(2.0)));
+                return;
+            }
+            float val = powf(2.0, rtosc_argument(msg, 0).i);
+            c.cfg.OscilSize = val;
+            d.broadcast(d.loc, "i", (int)(log(c.cfg.OscilSize*1.0)/log(2.0)));
+        }},
+};
+const rtosc::Ports &Config::ports = ::ports;
+#endif
 
 Config::Config()
 {}
+
 void Config::init()
 {
     maxstringsize = MAX_STRING_SIZE; //for ui
@@ -41,19 +161,15 @@ void Config::init()
     cfg.OscilSize  = 1024;
     cfg.SwapStereo = 0;
 
-    cfg.LinuxOSSWaveOutDev = new char[MAX_STRING_SIZE];
-    snprintf(cfg.LinuxOSSWaveOutDev, MAX_STRING_SIZE, "/dev/dsp");
-    cfg.LinuxOSSSeqInDev = new char[MAX_STRING_SIZE];
-    snprintf(cfg.LinuxOSSSeqInDev, MAX_STRING_SIZE, "/dev/sequencer");
-
-    cfg.DumpFile = "zynaddsubfx_dump.txt";
+    cfg.oss_devs.linux_wave_out = new char[MAX_STRING_SIZE];
+    snprintf(cfg.oss_devs.linux_wave_out, MAX_STRING_SIZE, "/dev/dsp");
+    cfg.oss_devs.linux_seq_in = new char[MAX_STRING_SIZE];
+    snprintf(cfg.oss_devs.linux_seq_in, MAX_STRING_SIZE, "/dev/sequencer");
 
     cfg.WindowsWaveOutId = 0;
     cfg.WindowsMidiInId  = 0;
 
     cfg.BankUIAutoClose = 0;
-    cfg.DumpNotesToFile = 0;
-    cfg.DumpAppend      = 1;
 
     cfg.GzipCompression = 3;
 
@@ -113,8 +229,8 @@ void Config::init()
 
 Config::~Config()
 {
-    delete [] cfg.LinuxOSSWaveOutDev;
-    delete [] cfg.LinuxOSSSeqInDev;
+    delete [] cfg.oss_devs.linux_wave_out;
+    delete [] cfg.oss_devs.linux_seq_in;
 
     for(int i = 0; i < winmidimax; ++i)
         delete [] winmididevices[i].name;
@@ -122,7 +238,7 @@ Config::~Config()
 }
 
 
-void Config::save()
+void Config::save() const
 {
     char filename[MAX_STRING_SIZE];
     getConfigFileName(filename, MAX_STRING_SIZE);
@@ -167,16 +283,6 @@ void Config::readConfig(const char *filename)
                                             cfg.BankUIAutoClose,
                                             0,
                                             1);
-
-        cfg.DumpNotesToFile = xmlcfg.getpar("dump_notes_to_file",
-                                            cfg.DumpNotesToFile,
-                                            0,
-                                            1);
-        cfg.DumpAppend = xmlcfg.getpar("dump_append",
-                                       cfg.DumpAppend,
-                                       0,
-                                       1);
-        cfg.DumpFile = xmlcfg.getparstr("dump_file", "");
 
         cfg.GzipCompression = xmlcfg.getpar("gzip_compression",
                                             cfg.GzipCompression,
@@ -225,10 +331,10 @@ void Config::readConfig(const char *filename)
 
         //linux stuff
         xmlcfg.getparstr("linux_oss_wave_out_dev",
-                         cfg.LinuxOSSWaveOutDev,
+                         cfg.oss_devs.linux_wave_out,
                          MAX_STRING_SIZE);
         xmlcfg.getparstr("linux_oss_seq_in_dev",
-                         cfg.LinuxOSSSeqInDev,
+                         cfg.oss_devs.linux_seq_in,
                          MAX_STRING_SIZE);
 
         //windows stuff
@@ -247,7 +353,7 @@ void Config::readConfig(const char *filename)
     cfg.OscilSize = (int) powf(2, ceil(logf(cfg.OscilSize - 1.0f) / logf(2.0f)));
 }
 
-void Config::saveConfig(const char *filename)
+void Config::saveConfig(const char *filename) const
 {
     XMLwrapper *xmlcfg = new XMLwrapper();
 
@@ -258,10 +364,6 @@ void Config::saveConfig(const char *filename)
     xmlcfg->addpar("oscil_size", cfg.OscilSize);
     xmlcfg->addpar("swap_stereo", cfg.SwapStereo);
     xmlcfg->addpar("bank_window_auto_close", cfg.BankUIAutoClose);
-
-    xmlcfg->addpar("dump_notes_to_file", cfg.DumpNotesToFile);
-    xmlcfg->addpar("dump_append", cfg.DumpAppend);
-    xmlcfg->addparstr("dump_file", cfg.DumpFile);
 
     xmlcfg->addpar("gzip_compression", cfg.GzipCompression);
 
@@ -291,8 +393,8 @@ void Config::saveConfig(const char *filename)
     xmlcfg->addpar("interpolation", cfg.Interpolation);
 
     //linux stuff
-    xmlcfg->addparstr("linux_oss_wave_out_dev", cfg.LinuxOSSWaveOutDev);
-    xmlcfg->addparstr("linux_oss_seq_in_dev", cfg.LinuxOSSSeqInDev);
+    xmlcfg->addparstr("linux_oss_wave_out_dev", cfg.oss_devs.linux_wave_out);
+    xmlcfg->addparstr("linux_oss_seq_in_dev", cfg.oss_devs.linux_seq_in);
 
     //windows stuff
     xmlcfg->addpar("windows_wave_out_id", cfg.WindowsWaveOutId);
@@ -300,15 +402,13 @@ void Config::saveConfig(const char *filename)
 
     xmlcfg->endbranch();
 
-    int tmp = cfg.GzipCompression;
-    cfg.GzipCompression = 0;
-    xmlcfg->saveXMLfile(filename);
-    cfg.GzipCompression = tmp;
+    // for some reason (which one?), the gzip compression is bashed to 0
+    xmlcfg->saveXMLfile(filename, 0);
 
     delete (xmlcfg);
 }
 
-void Config::getConfigFileName(char *name, int namesize)
+void Config::getConfigFileName(char *name, int namesize) const
 {
     name[0] = 0;
     snprintf(name, namesize, "%s%s", getenv("HOME"), "/.zynaddsubfxXML.cfg");

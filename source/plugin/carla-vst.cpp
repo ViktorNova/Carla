@@ -51,7 +51,7 @@ struct ERect {
     int16_t top, left, bottom, right;
 };
 #else
-# include "vst/aeffectx.h"
+# include "vst2/aeffectx.h"
 #endif
 
 using juce::ScopedJuceInitialiser_GUI;
@@ -83,8 +83,7 @@ public:
           fVstRect(),
           fMidiOutEvents(),
           fStateChunk(nullptr),
-          sJuceInitialiser(),
-          leakDetector_NativePlugin()
+          sJuceInitialiser()
     {
         fHost.handle      = this;
         fHost.uiName      = carla_strdup("CarlaVST");
@@ -168,8 +167,8 @@ public:
         fHandle = fDescriptor->instantiate(&fHost);
         CARLA_SAFE_ASSERT_RETURN(fHandle != nullptr, false);
 
-        carla_zeroStruct<NativeMidiEvent>(fMidiEvents, kMaxMidiEvents);
-        carla_zeroStruct<NativeTimeInfo>(fTimeInfo);
+        carla_zeroStructs(fMidiEvents, kMaxMidiEvents);
+        carla_zeroStruct(fTimeInfo);
 
         return true;
     }
@@ -185,13 +184,13 @@ public:
         switch (opcode)
         {
         case effSetSampleRate:
-            if (carla_compareFloats(fSampleRate, static_cast<double>(opt)))
+            if (carla_isEqual(fSampleRate, static_cast<double>(opt)))
                 return 0;
 
             fSampleRate = opt;
 
             if (fDescriptor->dispatcher != nullptr)
-                fDescriptor->dispatcher(fHandle, NATIVE_PLUGIN_OPCODE_SAMPLE_RATE_CHANGED, 0, 0, nullptr, (float)fSampleRate);
+                fDescriptor->dispatcher(fHandle, NATIVE_PLUGIN_OPCODE_SAMPLE_RATE_CHANGED, 0, 0, nullptr, opt);
             break;
 
         case effSetBlockSize:
@@ -208,12 +207,34 @@ public:
             if (value != 0)
             {
                 fMidiEventCount = 0;
-                carla_zeroStruct<NativeTimeInfo>(fTimeInfo);
+                carla_zeroStruct(fTimeInfo);
 
                 // tell host we want MIDI events
-                fAudioMaster(fEffect, audioMasterWantMidi, 0, 0, nullptr, 0.0f);
+                hostCallback(audioMasterWantMidi);
 
-                CARLA_SAFE_ASSERT_BREAK(! fIsActive);
+                // deactivate for possible changes
+                if (fDescriptor->deactivate != nullptr && fIsActive)
+                    fDescriptor->deactivate(fHandle);
+
+                // check if something changed
+                const uint32_t bufferSize = static_cast<uint32_t>(hostCallback(audioMasterGetBlockSize));
+                const double   sampleRate = static_cast<double>(hostCallback(audioMasterGetSampleRate));
+
+                if (bufferSize != 0 && fBufferSize != bufferSize)
+                {
+                    fBufferSize = bufferSize;
+
+                    if (fDescriptor->dispatcher != nullptr)
+                        fDescriptor->dispatcher(fHandle, NATIVE_PLUGIN_OPCODE_BUFFER_SIZE_CHANGED, 0, (int32_t)value, nullptr, 0.0f);
+                }
+
+                if (sampleRate != 0.0 && carla_isNotEqual(fSampleRate, sampleRate))
+                {
+                    fSampleRate = sampleRate;
+
+                    if (fDescriptor->dispatcher != nullptr)
+                        fDescriptor->dispatcher(fHandle, NATIVE_PLUGIN_OPCODE_SAMPLE_RATE_CHANGED, 0, 0, nullptr, (float)sampleRate);
+                }
 
                 if (fDescriptor->activate != nullptr)
                     fDescriptor->activate(fHandle);
@@ -243,10 +264,13 @@ public:
                 strBuf[0xff] = '\0';
                 std::snprintf(strBuf, 0xff, P_INTPTR, (intptr_t)ptr);
 
+                // set CARLA_PLUGIN_EMBED_WINID for external process
                 carla_setenv("CARLA_PLUGIN_EMBED_WINID", strBuf);
 
+                // show UI now
                 fDescriptor->ui_show(fHandle, true);
 
+                // reset CARLA_PLUGIN_EMBED_WINID just in case
                 carla_setenv("CARLA_PLUGIN_EMBED_WINID", "0");
 
                 ret = 1;
@@ -300,7 +324,6 @@ public:
             {
                 // host has not activated the plugin yet, nasty!
                 vst_dispatcher(effMainsChanged, 0, 1, nullptr, 0.0f);
-                fIsActive = true;
             }
 
             if (const VstEvents* const events = (const VstEvents*)ptr)
@@ -369,12 +392,11 @@ public:
         {
             // host has not activated the plugin yet, nasty!
             vst_dispatcher(effMainsChanged, 0, 1, nullptr, 0.0f);
-            fIsActive = true;
         }
 
         static const int kWantVstTimeFlags(kVstTransportPlaying|kVstPpqPosValid|kVstTempoValid|kVstTimeSigValid);
 
-        if (const VstTimeInfo* const vstTimeInfo = (const VstTimeInfo*)fAudioMaster(fEffect, audioMasterGetTime, 0, kWantVstTimeFlags, nullptr, 0.0f))
+        if (const VstTimeInfo* const vstTimeInfo = (const VstTimeInfo*)hostCallback(audioMasterGetTime, 0, kWantVstTimeFlags))
         {
             fTimeInfo.frame     = static_cast<uint64_t>(vstTimeInfo->samplePos);
             fTimeInfo.playing   =  (vstTimeInfo->flags & kVstTransportPlaying);
@@ -415,36 +437,17 @@ public:
         fMidiOutEvents.numEvents = 0;
 
         if (fHandle != nullptr)
+            // FIXME
             fDescriptor->process(fHandle, const_cast<float**>(inputs), outputs, static_cast<uint32_t>(sampleFrames), fMidiEvents, fMidiEventCount);
 
         fMidiEventCount = 0;
 
         if (fMidiOutEvents.numEvents > 0)
-            fAudioMaster(fEffect, audioMasterProcessEvents, 0, 0, &fMidiOutEvents, 0.0f);
+            hostCallback(audioMasterProcessEvents, 0, 0, &fMidiOutEvents, 0.0f);
     }
 
 protected:
     // -------------------------------------------------------------------
-
-    uint32_t handleGetBufferSize() const
-    {
-        return fBufferSize;
-    }
-
-    double handleGetSampleRate() const
-    {
-        return fSampleRate;
-    }
-
-    bool handleIsOffline() const
-    {
-        return false;
-    }
-
-    const NativeTimeInfo* handleGetTimeInfo() const
-    {
-        return &fTimeInfo;
-    }
 
     bool handleWriteMidiEvent(const NativeMidiEvent* const event)
     {
@@ -453,7 +456,13 @@ protected:
         CARLA_SAFE_ASSERT_RETURN(event->data[0] != 0, false);
 
         if (fMidiOutEvents.numEvents >= static_cast<int32_t>(kMaxMidiEvents))
-            return false;
+        {
+            // send current events
+            hostCallback(audioMasterProcessEvents, 0, 0, &fMidiOutEvents, 0.0f);
+
+            // clear
+            fMidiOutEvents.numEvents = 0;
+        }
 
         VstMidiEvent& vstMidiEvent(fMidiOutEvents.mdata[fMidiOutEvents.numEvents++]);
 
@@ -466,7 +475,7 @@ protected:
         for (; i<4; ++i)
             vstMidiEvent.midiData[i] = 0;
 
-        return false;
+        return true;
     }
 
     void handleUiParameterChanged(const uint32_t /*index*/, const float /*value*/) const
@@ -496,10 +505,27 @@ protected:
     intptr_t handleDispatcher(const NativeHostDispatcherOpcode opcode, const int32_t index, const intptr_t value, void* const ptr, const float opt)
     {
         carla_debug("NativePlugin::handleDispatcher(%i, %i, " P_INTPTR ", %p, %f)", opcode, index, value, ptr, opt);
-        return 0;
+
+        switch (opcode)
+        {
+        case NATIVE_HOST_OPCODE_NULL:
+        case NATIVE_HOST_OPCODE_UPDATE_PARAMETER:
+        case NATIVE_HOST_OPCODE_UPDATE_MIDI_PROGRAM:
+        case NATIVE_HOST_OPCODE_RELOAD_PARAMETERS:
+        case NATIVE_HOST_OPCODE_RELOAD_MIDI_PROGRAMS:
+        case NATIVE_HOST_OPCODE_RELOAD_ALL:
+        case NATIVE_HOST_OPCODE_UI_UNAVAILABLE:
+            break;
+
+        case NATIVE_HOST_OPCODE_HOST_IDLE:
+            hostCallback(audioMasterIdle);
+            break;
+        }
 
         // unused for now
-        (void)opcode; (void)index; (void)value; (void)ptr; (void)opt;
+        return 0;
+
+        (void)index; (void)value; (void)ptr; (void)opt;
     }
 
 private:
@@ -523,6 +549,16 @@ private:
     NativeTimeInfo  fTimeInfo;
     ERect           fVstRect;
 
+    // host callback
+    intptr_t hostCallback(const int32_t opcode,
+                          const int32_t index = 0,
+                          const intptr_t value = 0,
+                          void* const ptr = nullptr,
+                          const float opt = 0.0f)
+    {
+        return fAudioMaster(fEffect, opcode, index, value, ptr, opt);
+    }
+
     struct FixedVstEvents {
         int32_t numEvents;
         intptr_t reserved;
@@ -531,13 +567,11 @@ private:
 
         FixedVstEvents()
             : numEvents(0),
-              reserved(0),
-              data(),
-              mdata()
+              reserved(0)
         {
             for (uint32_t i=0; i<kMaxMidiEvents; ++i)
                 data[i] = (VstEvent*)&mdata[i];
-            carla_zeroStruct<VstMidiEvent>(mdata, kMaxMidiEvents);
+            carla_zeroStructs(mdata, kMaxMidiEvents);
         }
 
         CARLA_DECLARE_NON_COPY_STRUCT(FixedVstEvents);
@@ -553,22 +587,23 @@ private:
 
     static uint32_t host_get_buffer_size(NativeHostHandle handle)
     {
-        return handlePtr->handleGetBufferSize();
+        return handlePtr->fBufferSize;
     }
 
     static double host_get_sample_rate(NativeHostHandle handle)
     {
-        return handlePtr->handleGetSampleRate();
+        return handlePtr->fSampleRate;
     }
 
-    static bool host_is_offline(NativeHostHandle handle)
+    static bool host_is_offline(NativeHostHandle /*handle*/)
     {
-        return handlePtr->handleIsOffline();
+        // TODO
+        return false;
     }
 
     static const NativeTimeInfo* host_get_time_info(NativeHostHandle handle)
     {
-        return handlePtr->handleGetTimeInfo();
+        return &(handlePtr->fTimeInfo);
     }
 
     static bool host_write_midi_event(NativeHostHandle handle, const NativeMidiEvent* event)
@@ -664,7 +699,7 @@ static intptr_t vst_dispatcherCallback(AEffect* effect, int32_t opcode, int32_t 
 
             PluginListManager& plm(PluginListManager::getInstance());
 
-            for (LinkedList<const NativePluginDescriptor*>::Itenerator it = plm.descs.begin(); it.valid(); it.next())
+            for (LinkedList<const NativePluginDescriptor*>::Itenerator it = plm.descs.begin2(); it.valid(); it.next())
             {
                 const NativePluginDescriptor* const& tmpDesc(it.getValue());
 
@@ -685,10 +720,12 @@ static intptr_t vst_dispatcherCallback(AEffect* effect, int32_t opcode, int32_t 
     case effClose:
         if (VstObject* const obj = vstObjectPtr)
         {
-            if (obj->plugin != nullptr)
+            NativePlugin* const plugin(obj->plugin);
+
+            if (plugin != nullptr)
             {
-                delete obj->plugin;
                 obj->plugin = nullptr;
+                delete plugin;
             }
 
 #if 0

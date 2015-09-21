@@ -43,14 +43,14 @@ void EngineControlEvent::convertToMidiData(const uint8_t channel, uint8_t& size,
             size    = 3;
             data[0] = static_cast<uint8_t>(MIDI_STATUS_CONTROL_CHANGE | (channel & MIDI_CHANNEL_BIT));
             data[1] = MIDI_CONTROL_BANK_SELECT;
-            data[2] = uint8_t(carla_fixValue<float>(0.0f, float(MAX_MIDI_VALUE-1), value));
+            data[2] = uint8_t(carla_fixedValue<float>(0.0f, float(MAX_MIDI_VALUE-1), value));
         }
         else
         {
             size    = 3;
             data[0] = static_cast<uint8_t>(MIDI_STATUS_CONTROL_CHANGE | (channel & MIDI_CHANNEL_BIT));
             data[1] = static_cast<uint8_t>(param);
-            data[2] = uint8_t(carla_fixValue<float>(0.0f, 1.0f, value) * float(MAX_MIDI_VALUE-1));
+            data[2] = uint8_t(carla_fixedValue<float>(0.0f, 1.0f, value) * float(MAX_MIDI_VALUE-1));
         }
         break;
 
@@ -58,13 +58,13 @@ void EngineControlEvent::convertToMidiData(const uint8_t channel, uint8_t& size,
         size    = 3;
         data[0] = static_cast<uint8_t>(MIDI_STATUS_CONTROL_CHANGE | (channel & MIDI_CHANNEL_BIT));
         data[1] = MIDI_CONTROL_BANK_SELECT;
-        data[2] = uint8_t(carla_fixValue<uint16_t>(0, MAX_MIDI_VALUE-1, param));
+        data[2] = uint8_t(carla_fixedValue<uint16_t>(0, MAX_MIDI_VALUE-1, param));
         break;
 
     case kEngineControlEventTypeMidiProgram:
         size    = 2;
         data[0] = static_cast<uint8_t>(MIDI_STATUS_PROGRAM_CHANGE | (channel & MIDI_CHANNEL_BIT));
-        data[1] = uint8_t(carla_fixValue<uint16_t>(0, MAX_MIDI_VALUE-1, param));
+        data[1] = uint8_t(carla_fixedValue<uint16_t>(0, MAX_MIDI_VALUE-1, param));
         break;
 
     case kEngineControlEventTypeAllSoundOff:
@@ -84,7 +84,7 @@ void EngineControlEvent::convertToMidiData(const uint8_t channel, uint8_t& size,
 // -----------------------------------------------------------------------
 // EngineEvent
 
-void EngineEvent::fillFromMidiData(const uint8_t size, const uint8_t* const data) noexcept
+void EngineEvent::fillFromMidiData(const uint8_t size, const uint8_t* const data, const uint8_t midiPortOffset) noexcept
 {
     if (size == 0 || data == nullptr || data[0] < MIDI_STATUS_NOTE_OFF)
     {
@@ -133,7 +133,7 @@ void EngineEvent::fillFromMidiData(const uint8_t size, const uint8_t* const data
         {
             CARLA_SAFE_ASSERT_RETURN(size >= 3,);
 
-            const uint8_t midiValue(carla_fixValue<uint8_t>(0, 127, data[2])); // ensures 0.0<->1.0 value range
+            const uint8_t midiValue(carla_fixedValue<uint8_t>(0, 127, data[2])); // ensures 0.0<->1.0 value range
 
             ctrl.type  = kEngineControlEventTypeParameter;
             ctrl.param = midiControl;
@@ -156,7 +156,7 @@ void EngineEvent::fillFromMidiData(const uint8_t size, const uint8_t* const data
     {
         type = kEngineEventTypeMidi;
 
-        midi.port = 0;
+        midi.port = midiPortOffset;
         midi.size = size;
 
         if (size > EngineMidiEvent::kDataSize)
@@ -187,12 +187,16 @@ EngineOptions::EngineOptions() noexcept
     : processMode(ENGINE_PROCESS_MODE_MULTIPLE_CLIENTS),
       transportMode(ENGINE_TRANSPORT_MODE_JACK),
 #else
-    : processMode(ENGINE_PROCESS_MODE_CONTINUOUS_RACK),
+    : processMode(ENGINE_PROCESS_MODE_PATCHBAY),
       transportMode(ENGINE_TRANSPORT_MODE_INTERNAL),
 #endif
       forceStereo(false),
       preferPluginBridges(false),
+#ifdef CARLA_OS_WIN
+      preferUiBridges(false),
+#else
       preferUiBridges(true),
+#endif
       uisAlwaysOnTop(true),
       maxParameters(MAX_DEFAULT_PARAMETERS),
       uiBridgesTimeout(4000),
@@ -205,7 +209,6 @@ EngineOptions::EngineOptions() noexcept
       pathLV2(nullptr),
       pathVST2(nullptr),
       pathVST3(nullptr),
-      pathAU(nullptr),
       pathGIG(nullptr),
       pathSF2(nullptr),
       pathSFZ(nullptr),
@@ -250,12 +253,6 @@ EngineOptions::~EngineOptions() noexcept
     {
         delete[] pathVST3;
         pathVST3 = nullptr;
-    }
-
-    if (pathAU != nullptr)
-    {
-        delete[] pathAU;
-        pathAU = nullptr;
     }
 
     if (pathGIG != nullptr)
@@ -326,7 +323,7 @@ bool EngineTimeInfo::operator==(const EngineTimeInfo& timeInfo) const noexcept
         return false;
     if ((valid & kValidBBT) == 0)
         return true;
-    if (! carla_compareFloats(timeInfo.bbt.beatsPerMinute, bbt.beatsPerMinute))
+    if (carla_isNotEqual(timeInfo.bbt.beatsPerMinute, bbt.beatsPerMinute))
         return false;
     return true;
 }
